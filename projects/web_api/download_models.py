@@ -1,8 +1,9 @@
-#!/usr/bin/env python
-from huggingface_hub import snapshot_download
+import json
+import os
+import requests
+from modelscope import snapshot_download
 
-if __name__ == "__main__":
-
+if __name__ == '__main__':
     mineru_patterns = [
         "models/Layout/LayoutLMv3/*",
         "models/Layout/YOLO/*",
@@ -17,13 +18,8 @@ if __name__ == "__main__":
         local_dir="/opt/",
     )
 
-    layoutreader_pattern = [
-        "*.json",
-        "*.safetensors",
-    ]
     layoutreader_model_dir = snapshot_download(
-        "hantian/layoutreader",
-        allow_patterns=layoutreader_pattern,
+        "ppaanngggg/layoutreader",
         local_dir="/opt/layoutreader/",
     )
 

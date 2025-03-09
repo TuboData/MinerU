@@ -1,0 +1,70 @@
+# 基于NVIDIA CUDA 11.8镜像
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
+
+# 设置工作目录
+WORKDIR /app
+
+# 避免安装过程中的交互式提示
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 安装基础依赖
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-dev \
+    git \
+    wget \
+    build-essential \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libjpeg-dev \
+    libpng-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# 创建软链接使python命令指向python3
+RUN ln -sf /usr/bin/python3 /usr/bin/python
+RUN ln -sf /usr/bin/pip3 /usr/bin/pip
+
+# 升级pip
+RUN pip install --no-cache-dir --upgrade pip
+
+# 安装MinerU多GPU依赖项
+RUN pip install --no-cache-dir \
+    litserve \
+    python-multipart \
+    filetype \
+    joblib \
+    numpy \
+    requests \
+    loguru \
+    fitz \
+    PyMuPDF
+
+# 安装MinerU
+RUN pip install --no-cache-dir magic-pdf --extra-index-url https://wheels.myhloli.com
+
+# 安装PaddlePaddle GPU版本
+RUN pip install --no-cache-dir paddlepaddle-gpu==3.0.0b1 -i https://www.paddlepaddle.org.cn/packages/stable/cu118
+
+# 创建输出目录
+RUN mkdir -p /app/output
+
+# 复制应用文件
+COPY projects/web_api/app_multi_gpu.py /app/
+COPY projects/web_api/client_multi_gpu.py /app/
+
+# 设置环境变量
+ENV PYTHONUNBUFFERED=1
+ENV OUTPUT_DIR=/app/output
+ENV PORT=8888
+
+# 暴露服务端口
+EXPOSE 8888
+
+# 设置容器启动命令
+CMD ["python", "app_multi_gpu.py"]
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8888/health || exit 1 

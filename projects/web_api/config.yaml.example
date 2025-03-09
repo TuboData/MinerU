@@ -1,0 +1,33 @@
+# PDF处理系统配置示例
+# 将此文件复制为config.yaml并根据需要修改
+
+# 数据库配置
+mysql:
+  host: localhost  # 数据库主机地址
+  port: 3306       # 数据库端口
+  user: root       # 数据库用户名
+  password: password  # 数据库密码
+  database: pdf_processor  # 数据库名称
+
+# Redis配置
+redis:
+  host: localhost  # Redis主机地址
+  port: 6379       # Redis端口
+  db: 0            # Redis数据库索引
+  password: null   # Redis密码，如果没有可以设为null
+  decode_responses: true  # 是否自动解码响应
+
+# MinIO配置
+minio:
+  endpoint: localhost:9000  # MinIO端点地址
+  access_key: minioadmin    # MinIO访问密钥
+  secret_key: minioadmin    # MinIO秘密密钥
+  secure: false             # 是否使用HTTPS
+  bucket_name: pdf-processor  # MinIO存储桶名称
+
+# 应用设置
+app:
+  max_workers: 4      # 最大工作线程数
+  log_level: INFO     # 日志级别 (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  clean_interval_hours: 24  # 清理间隔(小时)
+  job_expiry_hours: 48      # 任务过期时间(小时) 
