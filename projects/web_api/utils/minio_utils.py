@@ -487,4 +487,60 @@ class MinioUtils:
         """Close the MinIO connection"""
         # MinIO client doesn't require explicit closing
         self.minio_client = None
-        logger.info("MinIO connection closed") 
+        logger.info("MinIO connection closed")
+        
+    def get_job_files(self, job_id: str) -> Dict[str, List[str]]:
+        """
+        获取指定任务ID的所有相关文件信息
+        
+        Args:
+            job_id: 任务ID
+            
+        Returns:
+            字典，包含不同类型文件的列表，例如：
+            {
+                "pdf": [...],
+                "images": [...],
+                "json": [...],
+                "md": [...]
+            }
+        """
+        if not self.is_connected():
+            logger.warning("MinIO client not available, skipping file query")
+            return {}
+            
+        try:
+            result = {
+                "pdf": [],
+                "images": [],
+                "json": [],
+                "md": []
+            }
+            
+            bucket_name = self.config["bucket_name"]
+            prefix = f"jobs/{job_id}"
+            
+            # 获取所有对象
+            objects = list(self.minio_client.list_objects(bucket_name, prefix=prefix, recursive=True))
+            logger.info(f"Found {len(objects)} objects for job {job_id}")
+            
+            # 分类文件
+            for obj in objects:
+                if not hasattr(obj, 'object_name'):
+                    continue
+                    
+                obj_name = obj.object_name
+                if obj_name.endswith('.pdf'):
+                    result["pdf"].append(obj_name)
+                elif obj_name.endswith('.json'):
+                    result["json"].append(obj_name)
+                elif obj_name.endswith('.md'):
+                    result["md"].append(obj_name)
+                elif '/images/' in obj_name:
+                    result["images"].append(obj_name)
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error getting job files from MinIO: {str(e)}")
+            return {} 

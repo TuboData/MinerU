@@ -156,7 +156,6 @@ class ConfigLoader:
         
         # 获取环境变量配置，优先级高于配置文件
         env_config = {
-            "output_dir": os.environ.get("APP_OUTPUT_DIR"),
             "max_workers": os.environ.get("APP_MAX_WORKERS"),
             "log_level": os.environ.get("APP_LOG_LEVEL"),
             "clean_interval_hours": os.environ.get("APP_CLEAN_INTERVAL_HOURS"),

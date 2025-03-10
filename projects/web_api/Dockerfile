@@ -85,4 +85,4 @@ EXPOSE 8000
 
 # Command to run FastAPI using Uvicorn, pointing to app.py and binding to 0.0.0.0:8000
 ENTRYPOINT [ "/app/entrypoint.sh" ]
-CMD ["--host", "0.0.0.0", "--port", "8000"]
+CMD ["--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
