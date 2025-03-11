@@ -1092,9 +1092,38 @@ async def get_job_files(job_id: str):
         job_id: 任务ID
 
     Returns:
-        文件列表，按类型分组
+        result = {
+            "job_id": job_id,
+            "layout_pdf": "",
+            "spans_pdf": "",
+            "model_pdf": "",
+            "content_list_json": "",
+            "middle_json": "",
+            "model_json": "",
+            "markdown": "",
+            "images": []
+        }
+    - layout_pdf: 布局可视化PDF
+    - spans_pdf: 文本块可视化PDF
+    - model_pdf: 模型结果可视化PDF
+    - model_json: 模型推理结果JSON
+    - middle_json: 中间处理结果JSON
+    - content_list_json: 内容列表JSON
+    - markdown: 识别结果的Markdown文本
+    - images: 识别结果的图片
     """
     try:
+        result = {
+            "job_id": job_id,
+            "layout_pdf": "",
+            "spans_pdf": "",
+            "model_pdf": "",
+            "content_list_json": "",
+            "middle_json": "",
+            "model_json": "",
+            "markdown": "",
+            "images": []
+        }
         # 检查任务是否存在
         job_data = mysql_utils.get_job(job_id)
         if not job_data:
@@ -1102,11 +1131,29 @@ async def get_job_files(job_id: str):
 
         # 从MinIO获取文件列表
         files = minio_utils.get_job_files(job_id)
+        # 分类文件
+        for obj in files:
+            if not hasattr(obj, 'object_name'):
+                continue
+            obj_name = obj.object_name
+            if obj_name.endswith('layout.pdf'):
+                result["layout_pdf"] = obj_name
+            elif obj_name.endswith('spans.pdf'):
+                result["spans_pdf"] = obj_name
+            elif obj_name.endswith('model.pdf'):
+                result["model_pdf"] = obj_name
+            elif obj_name.endswith('content_list.json'):
+                result["content_list_json"] = obj_name
+            elif obj_name.endswith('middle.json'):
+                result["middle_json"] = obj_name
+            elif obj_name.endswith('model.json'):
+                result["model_json"] = obj_name
+            elif obj_name.endswith('.md'):
+                result["markdown"] = obj_name
+            elif '/images/' in obj_name:
+                result["images"].append(obj_name)
 
-        return {
-            "job_id": job_id,
-            "files": files
-        }
+        return result
 
     except HTTPException:
         raise
