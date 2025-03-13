@@ -8,7 +8,6 @@ from typing import Dict, List, Optional, Any, Union, Tuple
 import mysql.connector
 from mysql.connector import pooling
 import time
-import json
 from datetime import datetime
 import re
 
@@ -210,7 +209,7 @@ class MySQLUtils:
         """
         create_jobs_table_query = """
         CREATE TABLE IF NOT EXISTS pdf_jobs (
-            id VARCHAR(36) PRIMARY KEY,
+            id VARCHAR(80) PRIMARY KEY,
             pdf_name VARCHAR(255) NOT NULL,
             status VARCHAR(20) NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -287,7 +286,9 @@ class MySQLUtils:
                 SET pdf_name = %s, status = %s, error_message = %s
                 WHERE id = %s
                 """
-                self.execute_update(update_query, (pdf_name, status, error_message, job_id))
+                count = self.execute_update(update_query, (pdf_name, status, error_message, job_id))
+                if count == 0:
+                    raise Exception(f"Job {job_id} database updating failed")
                 logger.info(f"Updated existing job {job_id} in database")
             else:
                 # 如果不存在，则插入新记录
@@ -295,7 +296,9 @@ class MySQLUtils:
                 INSERT INTO pdf_jobs (id, pdf_name, status, error_message)
                 VALUES (%s, %s, %s, %s)
                 """
-                self.execute_update(insert_query, (job_id, pdf_name, status, error_message))
+                count = self.execute_update(insert_query, (job_id, pdf_name, status, error_message))
+                if count == 0:
+                    raise Exception(f"Job {job_id} database insertion failed")
                 logger.info(f"Inserted new job {job_id} into database")
                 
             return True

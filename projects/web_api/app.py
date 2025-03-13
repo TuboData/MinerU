@@ -9,13 +9,17 @@ from typing import Dict, List, Optional, Tuple, Union, Any
 from datetime import datetime
 import shutil
 import io
+
+import minio
 import uvicorn
 from fastapi import FastAPI, BackgroundTasks, UploadFile, File, Form, HTTPException, Depends, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from loguru import logger
+from minio.deleteobjects import DeleteObject
 from prometheus_client import Counter, Histogram, Gauge, generate_latest
 import traceback
 from fastapi.exception_handlers import http_exception_handler
+from minio import Minio
 
 from starlette.requests import Request
 
@@ -109,7 +113,7 @@ def get_job_info(job_id: str) -> Optional[Dict[str, Any]]:
 # 数据写入器
 class MemoryDataWriter(DataWriter):
     def __init__(self):
-        self.buffer = StringIO()
+        self.buffer = io.StringIO()
 
     def write(self, path: str, data: bytes) -> None:
         if isinstance(data, str):
@@ -173,7 +177,7 @@ def init_writers(
     )
     
     image_writer = S3DataWriter(
-        image_storage_path, 
+        image_storage_path,
         bucket=bucket_name,
         ak=ak,
         sk=sk,
@@ -228,10 +232,10 @@ def process_pdf(
     return infer_result, pipe_result
 
 
-def encode_image(image_path: str) -> str:
-    """Encode image using base64"""
-    with open(image_path, "rb") as f:
-        return b64encode(f.read()).decode()
+# def encode_image(image_path: str) -> str:
+#     """Encode image using base64"""
+#     with open(image_path, "rb") as f:
+#         return b64encode(f.read()).decode()
 
 
 def process_pdf_background(
@@ -304,12 +308,13 @@ def process_pdf_background(
         ak = minio_config.get("access_key", "minioadmin")
         sk = minio_config.get("secret_key", "minioadmin")
         endpoint_url = minio_config.get("endpoint", "localhost:9000")
-        
+        secure = minio_config.get("secure", False)
+
+        endpoint_with_proxy = endpoint_url
         # 确保endpoint_url包含协议前缀
-        if endpoint_url and not endpoint_url.startswith(('http://', 'https://')):
-            secure = minio_config.get("secure", False)
+        if endpoint_with_proxy and not endpoint_with_proxy.startswith(('http://', 'https://')):
             protocol = "https://" if secure else "http://"
-            endpoint_url = f"{protocol}{endpoint_url}"
+            endpoint_with_proxy = f"{protocol}{endpoint_with_proxy}"
         
         # 创建写入器
         output_writer = S3DataWriter(
@@ -317,7 +322,7 @@ def process_pdf_background(
             bucket=bucket_name,
             ak=ak,
             sk=sk,
-            endpoint_url=endpoint_url
+            endpoint_url=endpoint_with_proxy
         )
         
         image_writer = S3DataWriter(
@@ -325,9 +330,15 @@ def process_pdf_background(
             bucket=bucket_name,
             ak=ak,
             sk=sk,
-            endpoint_url=endpoint_url
+            endpoint_url=endpoint_with_proxy
         )
-        
+
+        minio = Minio(endpoint_url, access_key=ak, secret_key=sk, secure=False)
+        objects = minio.list_objects(bucket_name, storage_base_path, True)
+        v = [DeleteObject(i.object_name) for i in objects]
+        if len(v) > 0:
+            minio.remove_objects(bucket_name, v)
+
         # 保存原始PDF到MinIO
         output_writer.write(f"{job_id}.pdf", pdf_bytes)
         
@@ -335,8 +346,12 @@ def process_pdf_background(
         update_job_progress(job_id, 15.0)
         
         # 处理PDF
-        logger.info(f"Processing PDF for job {job_id} with method {parse_method}")
-        infer_result, pipe_result = process_pdf(pdf_bytes, parse_method, image_writer)
+        try:
+            logger.info(f"Processing PDF for job {job_id} with method {parse_method}")
+            infer_result, pipe_result = process_pdf(pdf_bytes, parse_method, image_writer)
+        except Exception as e:
+            logger.warning(f"Job {job_id}: 处理PDF失败: {e}")
+            raise e
         
         # 更新进度到50% - PDF处理完成
         update_job_progress(job_id, 50.0)
@@ -387,18 +402,18 @@ def process_pdf_background(
             logger.warning(f"Job {job_id}: 绘制布局结果失败: {e}")
             
         # 绘制span结果并保存
-        try:
-            span_pdf_path = os.path.join(temp_dir, f"{job_id}_spans.pdf")
-            pipe_result.draw_span(span_pdf_path)
-            
-            # 读取生成的文件并上传到MinIO
-            if os.path.exists(span_pdf_path):
-                with open(span_pdf_path, 'rb') as f:
-                    span_viz_bytes = f.read()
-                    output_writer.write(f"{job_id}_spans.pdf", span_viz_bytes)
-                    logger.info(f"Job {job_id}: 成功保存span可视化结果")
-        except Exception as e:
-            logger.warning(f"Job {job_id}: 绘制span结果失败: {e}")
+        # try:
+        #     span_pdf_path = os.path.join(temp_dir, f"{job_id}_spans.pdf")
+        #     pipe_result.draw_span(span_pdf_path)
+        #
+        #     # 读取生成的文件并上传到MinIO
+        #     if os.path.exists(span_pdf_path):
+        #         with open(span_pdf_path, 'rb') as f:
+        #             span_viz_bytes = f.read()
+        #             output_writer.write(f"{job_id}_spans.pdf", span_viz_bytes)
+        #             logger.info(f"Job {job_id}: 成功保存span可视化结果")
+        # except Exception as e:
+        #     logger.warning(f"Job {job_id}: 绘制span结果失败: {e}")
         
         # 清理临时文件
         try:
@@ -432,33 +447,33 @@ def process_pdf_background(
                 logger.warning(f"Job {job_id}: 获取内容列表失败: {e}")
                 
         # 获取markdown
-        try:
-            md_content = pipe_result.get_markdown(image_dir)
-            output_writer.write_string(f"{job_id}.md", md_content)
-            result_dict["result"]["markdown"] = md_content
-            logger.info(f"Job {job_id}: 成功保存Markdown")
-        except Exception as e:
-            logger.warning(f"Job {job_id}: 获取Markdown失败: {e}")
+        # try:
+        #     md_content = pipe_result.get_markdown(image_dir)
+        #     output_writer.write_string(f"{job_id}.md", md_content)
+        #     result_dict["result"]["markdown"] = md_content
+        #     logger.info(f"Job {job_id}: 成功保存Markdown")
+        # except Exception as e:
+        #     logger.warning(f"Job {job_id}: 获取Markdown失败: {e}")
         
         # 更新进度到70% - 结果提取完成
         update_job_progress(job_id, 70.0)
         
         # 处理图像
-        if return_images and hasattr(infer_result, 'images') and infer_result.images:
-            # 图像数据直接保存到MinIO并记录
-            images_data = []
-            for i, img_data in enumerate(infer_result.images):
-                # 保存图像到MinIO
-                img_name = f"{i}.jpg"
-                image_writer.write(img_name, img_data)
-                
-                # 添加到响应数据中 - 使用字节数据创建内存文件进行base64编码
-                buffer = io.BytesIO(img_data)
-                base64_data = b64encode(buffer.getvalue()).decode()
-                images_data.append({"id": i, "data": base64_data})
-            
-            # 添加图像信息到结果字典
-            result_dict["result"]["images"] = images_data
+        # if return_images and hasattr(infer_result, 'images') and infer_result.images:
+        #     # 图像数据直接保存到MinIO并记录
+        #     images_data = []
+        #     for i, img_data in enumerate(infer_result.images):
+        #         # 保存图像到MinIO
+        #         img_name = f"{i}.jpg"
+        #         image_writer.write(img_name, img_data)
+        #
+        #         # 添加到响应数据中 - 使用字节数据创建内存文件进行base64编码
+        #         buffer = io.BytesIO(img_data)
+        #         base64_data = b64encode(buffer.getvalue()).decode()
+        #         images_data.append({"id": i, "data": base64_data})
+        #
+        #     # 添加图像信息到结果字典
+        #     result_dict["result"]["images"] = images_data
         
         # 更新进度到90% - 图像保存完成
         update_job_progress(job_id, 90.0)
@@ -477,6 +492,7 @@ def process_pdf_background(
         update_job_progress(job_id, 100.0, JobStatus.COMPLETED)
         
         logger.info(f"PDF processing for job {job_id} completed successfully")
+        output_writer.write("finish", bytes([1]))
     except Exception as e:
         logger.error(f"Error processing PDF for job {job_id}: {e}")
         stacktrace = traceback.format_exc()
@@ -487,6 +503,7 @@ def process_pdf_background(
         mysql_utils.save_pdf_job_error(job_id, error_message)
         
         logger.info(f"Job {job_id} marked as failed due to error: {error_message}")
+
 
 # 辅助函数：更新任务进度，带有重试机制
 def update_job_progress(job_id: str, progress: float, status: Optional[str] = None):
@@ -781,7 +798,9 @@ def get_job_result_from_minio(job_id: str) -> Optional[Dict[str, Any]]:
 async def pdf_parse_from_minio(
         background_tasks: BackgroundTasks,
         bucket_name: str = Form(...),
-        object_name: str = Form(...)
+        object_name: str = Form(...),
+        lang: str = Form(...),
+        job_id: str = Form(...)
 ):
     """
     处理MinIO中的PDF文件并返回任务ID，用于后续检查状态和获取结果。
@@ -790,6 +809,8 @@ async def pdf_parse_from_minio(
         background_tasks: 后台任务对象
         bucket_name: MinIO桶名称
         object_name: MinIO中的PDF对象名称
+        lang: 语言， cn为中文，en为英语, auto为自动
+        job_id: 任务id
 
     Returns:
         任务ID和状态信息
@@ -801,7 +822,7 @@ async def pdf_parse_from_minio(
             raise HTTPException(status_code=404, detail="PDF file not found in MinIO")
 
         # 生成任务ID
-        job_id = str(uuid.uuid4())
+        # job_id = str(uuid.uuid4())
 
         # 获取文件名
         pdf_name = os.path.basename(object_name)
@@ -1478,4 +1499,4 @@ async def metrics():
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8888)
+    uvicorn.run(app, host="0.0.0.0", port=7777)

@@ -3,8 +3,8 @@
         "bucket-name-1":["ak", "sk", "endpoint"],
         "bucket-name-2":["ak", "sk", "endpoint"]
     },
-    "models-dir":"/opt/models",
-    "layoutreader-model-dir":"/opt/layoutreader",
+    "models-dir":"/app/models/miner-u/models",
+    "layoutreader-model-dir":"/app/models/miner-u/layout-reader",
     "device-mode":"cuda",
     "layout-config": {
         "model": "doclayout_yolo"

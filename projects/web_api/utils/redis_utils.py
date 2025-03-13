@@ -29,7 +29,7 @@ class RedisUtils:
             self.config = {
                 "host": os.environ.get("REDIS_HOST", "localhost"),
                 "port": int(os.environ.get("REDIS_PORT", 6379)),
-                "db": int(os.environ.get("REDIS_DB", 0)),
+                "db": int(os.environ.get("REDIS_DB", 2)),
                 "password": os.environ.get("REDIS_PASSWORD", None),
                 "decode_responses": True  # Auto-decode Redis responses to strings
             }
@@ -171,7 +171,7 @@ class RedisUtils:
                 "progress": progress,
                 "updated_at": time.time()
             })
-            
+            self.redis_client.expire(job_key, 86400)
             logger.info(f"Updated job {job_id} progress to {progress}% in Redis")
             return True
             

@@ -3,4 +3,19 @@ name = "web-api"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "common>=0.1.2",
+    "doclayout-yolo>=0.0.3",
+    "fastapi>=0.115.11",
+    "magic-pdf>=1.2.2",
+    "paddleocr>=2.10.0",
+    "paddlepaddle-gpu>=2.6.2",
+    "prometheus-client>=0.21.1",
+    "pycocotools>=2.0.8",
+    "setuptools>=76.0.0",
+    "ultralytics>=8.3.89",
+    "uvicorn>=0.34.0",
+]
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
