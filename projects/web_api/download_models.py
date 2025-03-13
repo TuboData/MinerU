@@ -15,12 +15,12 @@ if __name__ == '__main__':
     model_dir = snapshot_download(
         "opendatalab/PDF-Extract-Kit-1.0",
         allow_patterns=mineru_patterns,
-        local_dir="/app/models/miner-u/",
+        local_dir="models/miner-u/",
     )
 
     layoutreader_model_dir = snapshot_download(
         "ppaanngggg/layoutreader",
-        local_dir="/app/models/miner-u/layout-reader/",
+        local_dir="models/layout-reader/",
     )
 
     model_dir = model_dir + "/models"

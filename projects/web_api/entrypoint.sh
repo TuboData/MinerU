@@ -11,4 +11,4 @@ export CONFIG_PATH="/app/config.yaml"
 mkdir -p /app/output
 
 # 启动应用
-exec uvicorn app:app "$@"
+exec venv/bin/uvicorn app:app "$@"

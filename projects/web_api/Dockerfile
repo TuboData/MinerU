@@ -31,37 +31,48 @@ RUN apt-get update && \
       libxrender-dev \
       libgomp1 \
       pkg-config \
-      cmake
+      cmake \
+      python3.10 \
+      python3.10-venv \
+      python3.10-dev \
+      && ln -s /usr/bin/python3.10 /usr/bin/python \
+      && apt-get clean \
+      && rm -rf /var/lib/apt/lists/
 
-RUN apt-get install -y --no-install-recommends \
-    python3.10 \
-    python3.10-venv \
-    python3.10-dev \
-    && ln -s /usr/bin/python3.10 /usr/bin/python
 
-RUN apt-get clean \
-    && rm -rf /var/lib/apt/lists/
 
 # Build Python dependencies
+# ADD .venv/ venv/
+
+#RUN python -m venv /app/venv
+#ADD .venv/lib/python3.12/ venv/lib/python3.10/
+#ADD .venv/share/ venv/share/
+#ADD .venv/bin/ venv/bin-back/
+#RUN mv venv/bin-back/* venv/bin/
+
 COPY requirements.txt .
 RUN grep -v "detectron2" requirements.txt > requirements_without_detectron2.txt
-
-
 RUN python -m venv /app/venv && \
     . /app/venv/bin/activate && \
     pip config set global.index-url https://mirrors.aliyun.com/pypi/simple && \
     pip config set global.trusted-host mirrors.aliyun.com && \
     pip install torch==2.3.1 torchvision==0.18.1 numpy pillow  && \
-    pip install -r requirements_without_detectron2.txt && \
-    pip install git+https://github.com/facebookresearch/detectron2.git@9604f5995cc628619f0e4fd913453b4d7d61db3f && \
-    pip uninstall -y paddlepaddle && \
-    pip install -i https://www.paddlepaddle.org.cn/packages/stable/cu118/ \
-        paddlepaddle-gpu==3.0.0rc1
+    pip install -r requirements_without_detectron2.txt
 
-# Download models
-COPY download_models.py .
-RUN . /app/venv/bin/activate && \
-    python ./download_models.py
+RUN . /app/venv/bin/activate \
+    && pip install --no-build-isolation git+https://github.com/facebookresearch/detectron2.git@9604f5995cc628619f0e4fd913453b4d7d61db3f
+
+
+
+RUN . /app/venv/bin/activate \
+    && pip uninstall -y paddlepaddle \
+    && pip install -i https://www.paddlepaddle.org.cn/packages/stable/cu118/ paddlepaddle-gpu==3.0.0rc1
+
+# COPY models
+ADD models/ models/
+#COPY download_models.py .
+#RUN . /app/venv/bin/activate && \
+#    python ./download_models.py
 
 
 # Create volume for paddleocr models
@@ -76,7 +87,7 @@ COPY config.yaml /app/config.yaml
 
 # Copy the app and its utilities
 COPY entrypoint.sh /app/entrypoint.sh
-COPY magic-pdf.json /root/magic-pdf.json
+COPY docker/magic-pdf.json /root/magic-pdf.json
 COPY app.py /app/app.py
 COPY utils/ /app/utils/
 
