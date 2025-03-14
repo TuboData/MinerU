@@ -168,7 +168,6 @@ projects/web_api/
 ├── config.yaml            # 配置文件
 ├── requirements.txt       # 依赖列表
 ├── Dockerfile             # Docker构建文件
-├── docker-compose.yml     # Docker Compose配置
 ├── entrypoint.sh          # Docker入口脚本
 │
 ├── utils/                 # 工具类
