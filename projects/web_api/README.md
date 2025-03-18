@@ -12,10 +12,12 @@
 - 任务失败自动重试功能
 - 过期任务自动清理功能
 - 支持配置文件和环境变量配置
+- 适配多种解析方法，自动选择最佳解析策略
 
 ## 系统要求
 
-- Python 3.8+
+- Python 3.10+
+- CUDA 12.1 (用于GPU加速)
 - MySQL 8.0+
 - Redis 6.0+
 - MinIO (最新版本)
@@ -41,6 +43,7 @@ redis:
   port: 6379
   db: 0
   password: null
+  decode_responses: true
 
 # MinIO配置
 minio:
@@ -54,6 +57,8 @@ minio:
 app:
   max_workers: 4
   log_level: INFO
+  clean_interval_hours: 24
+  job_expiry_hours: 48
 ```
 
 环境变量也可以用来覆盖配置文件中的设置，例如：
@@ -79,7 +84,7 @@ cd projects/web_api
 - https://docs.astral.sh/uv/
 
 ```bash
-uv venv --pyhton=3.10
+uv venv --python=3.10
 uv pip install -r requirements.txt
 ```
 
@@ -101,8 +106,8 @@ uvicorn app:app --host 0.0.0.0 --port 8000 --workers 4
 ### 使用Docker运行，需要CUDA
 
 ```bash
-docker build -t tubo-pdf -f Dockerfile .
-docker run -d --name tubo-pdf -p 8000:8000 tubo-pdf
+docker build -t pdf-processor -f Dockerfile .
+docker run -d --name pdf-processor -p 8000:8000 --gpus all pdf-processor
 ```
 
 ### 使用Docker Compose运行
@@ -121,12 +126,11 @@ docker-compose up -d
 
 - `POST /pdf_parse`: 上传并解析PDF文件
 - `POST /pdf_parse_from_minio`: 从MinIO读取并解析PDF文件
-- `GET /pdf_job/{job_id}`: 获取任务状态，包含进度百分比
-- `GET /pdf_result/{job_id}`: 获取完整的处理结果
-- `GET /pdf_result/{job_id}/content`: 仅获取内容列表
-- `GET /pdf_result/{job_id}/images`: 仅获取图像
-- `GET /pdf_result/{job_id}/layout`: 仅获取布局信息
-- `GET /pdf_result/{job_id}/info`: 仅获取PDF信息
+- `GET /get_job_status/{job_id}`: 获取任务状态，包含进度百分比
+- `GET /pdf_files/{job_id}`: 获取任务相关的所有文件列表
+- `GET /pdf_file/{job_id}/{file_type}`: 获取任务的指定类型文件
+- `GET /pdf_image/{job_id}/{image_path}`: 获取任务的特定图片文件
+- `DELETE /pdf_job/{job_id}`: 删除任务及其所有相关数据
 - `POST /pdf_job/{job_id}/retry`: 重试失败的任务
 - `POST /pdf_jobs/status`: 批量查询多个任务的状态
 - `GET /health`: 健康检查
@@ -139,6 +143,8 @@ docker-compose up -d
 
 1. **文件上传解析** - 使用`/pdf_parse`接口，必须提供PDF文件
 2. **MinIO文件解析** - 使用`/pdf_parse_from_minio`接口，指定bucket和object路径
+3. **文件结果获取** - 使用`/pdf_file/{job_id}/{file_type}`接口，可获取不同类型的结果文件
+4. **图片获取** - 使用`/pdf_image/{job_id}/{image_path}`接口，获取提取的图片
 
 所有处理结果和原始PDF都将保存在MinIO中，路径格式为`jobs/{job_id}/`，图片保存在`jobs/{job_id}/images/`下。
 
@@ -167,8 +173,11 @@ projects/web_api/
 ├── app.py                 # 主应用文件
 ├── config.yaml            # 配置文件
 ├── requirements.txt       # 依赖列表
+├── .env                   # 环境变量配置文件
 ├── Dockerfile             # Docker构建文件
 ├── entrypoint.sh          # Docker入口脚本
+├── download_models.py     # 模型下载脚本
+├── pyproject.toml         # Python项目配置
 │
 ├── utils/                 # 工具类
 │   ├── __init__.py
@@ -177,9 +186,14 @@ projects/web_api/
 │   ├── redis_utils.py     # Redis工具类
 │   └── minio_utils.py     # MinIO工具类
 │
+├── docker/                # Docker相关配置
+│   └── magic-pdf.json     # Magic PDF配置
+│
+├── local_run/             # 本地运行配置
+│   └── magic-pdf.json     # Magic PDF本地配置
+│
 └── tests/                 # 测试用例
     ├── __init__.py
-    ├── test_api.py        # API测试
     ├── test_mysql_utils.py # MySQL工具测试
     ├── test_redis_utils.py # Redis工具测试
     └── test_minio_utils.py # MinIO工具测试
