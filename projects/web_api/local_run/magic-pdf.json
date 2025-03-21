@@ -3,7 +3,7 @@
         "bucket-name-1":["ak", "sk", "endpoint"],
         "bucket-name-2":["ak", "sk", "endpoint"]
     },
-    "models-dir":"/home/tubo/llm/MinerU/projects/web_api/models/miner-u",
+    "models-dir":"/home/tubo/llm/MinerU/projects/web_api/models/miner-u/models",
     "layoutreader-model-dir":"/home/tubo/llm/MinerU/projects/web_api/models/layout-reader",
     "device-mode":"cuda",
     "layout-config": {

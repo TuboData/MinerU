@@ -26,8 +26,7 @@ minio:
 
 # 应用设置
 app:
-  output_dir: output
-  max_workers: 4
+  max_workers: 1
   log_level: INFO
   clean_interval_hours: 24
   job_expiry_hours: 48

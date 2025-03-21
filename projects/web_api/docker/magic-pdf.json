@@ -3,7 +3,7 @@
         "bucket-name-1":["ak", "sk", "endpoint"],
         "bucket-name-2":["ak", "sk", "endpoint"]
     },
-    "models-dir":"/app/models/miner-u",
+    "models-dir":"/app/models/miner-u/models",
     "layoutreader-model-dir":"/app/models/layout-reader",
     "device-mode":"cuda",
     "layout-config": {
