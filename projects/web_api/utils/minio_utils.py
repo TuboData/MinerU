@@ -15,81 +15,7 @@ from minio.error import S3Error
 logger = logging.getLogger(__name__)
 
 class MinioUtils:
-    """MinIO object storage utilities"""
-    
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """
-        Initialize MinIO client
-        
-        Args:
-            config: MinIO configuration dictionary, or None to use environment variables
-        """
-        self.minio_client = None
-        
-        if config is None:
-            # Use environment variables for configuration
-            self.config = {
-                "endpoint": os.environ.get("MINIO_ENDPOINT", "localhost:9000"),
-                "access_key": os.environ.get("MINIO_ACCESS_KEY", "minioadmin"),
-                "secret_key": os.environ.get("MINIO_SECRET_KEY", "minioadmin"),
-                "secure": os.environ.get("MINIO_SECURE", "false").lower() == "true",
-                "bucket_name": os.environ.get("MINIO_BUCKET", "pdf-processor"),
-            }
-        else:
-            self.config = config
-            
-        self.connect()
-        
-    def connect(self) -> bool:
-        """
-        Connect to MinIO server
-        
-        Returns:
-            True if connected successfully, False otherwise
-        """
-        try:
-            endpoint = self.config["endpoint"]
-            
-            # Minio类不需要HTTP前缀，但需要确保格式正确
-            # 如果有HTTP前缀，需要移除
-            if endpoint.startswith(('http://', 'https://')):
-                endpoint = endpoint.split('://', 1)[1]
-            
-            self.minio_client = Minio(
-                endpoint=endpoint,
-                access_key=self.config["access_key"],
-                secret_key=self.config["secret_key"],
-                secure=self.config["secure"]
-            )
-            
-            # Ensure bucket exists
-            bucket_name = self.config["bucket_name"]
-            self.ensure_bucket_exists(bucket_name)
-            
-            logger.info(f"MinIO connection established successfully with bucket: {bucket_name}")
-            return True
-            
-        except Exception as err:
-            logger.error(f"Failed to initialize MinIO client: {err}")
-            return False
-    
-    def is_connected(self) -> bool:
-        """
-        Check if MinIO connection is available
-        
-        Returns:
-            True if connected, False otherwise
-        """
-        if not self.minio_client:
-            return False
-            
-        try:
-            self.minio_client.list_buckets()
-            return True
-        except Exception:
-            return False
-    
-    def ensure_bucket_exists(self, bucket_name: str) -> bool:
+    def ensure_bucket_exists(self, minio, bucket_name: str) -> bool:
         """
         Ensure the bucket exists, create it if necessary
         
@@ -99,19 +25,17 @@ class MinioUtils:
         Returns:
             True if bucket exists or was created, False on error
         """
-        if not self.minio_client:
-            return False
             
         try:
-            if not self.minio_client.bucket_exists(bucket_name):
-                self.minio_client.make_bucket(bucket_name)
+            if not minio.bucket_exists(bucket_name):
+                minio.make_bucket(bucket_name)
                 logger.info(f"Created MinIO bucket: {bucket_name}")
             return True
         except S3Error as err:
             logger.error(f"Error ensuring bucket exists: {err}")
             return False
     
-    def upload_file(self, local_path: str, object_name: Optional[str] = None) -> Optional[str]:
+    def upload_file(self, minio, local_path: str, object_name: Optional[str] = None) -> Optional[str]:
         """
         Upload file to MinIO
         
@@ -122,9 +46,6 @@ class MinioUtils:
         Returns:
             Object name if uploaded successfully, None otherwise
         """
-        if not self.is_connected():
-            logger.warning("MinIO client not available, skipping upload")
-            return None
             
         try:
             bucket_name = self.config["bucket_name"]
@@ -133,7 +54,7 @@ class MinioUtils:
             if object_name is None:
                 object_name = os.path.basename(local_path)
                 
-            self.minio_client.fput_object(
+            minio.fput_object(
                 bucket_name,
                 object_name,
                 local_path,
@@ -158,9 +79,6 @@ class MinioUtils:
         Returns:
             True if uploaded successfully, False otherwise
         """
-        if not self.is_connected():
-            logger.warning("MinIO client not available, skipping upload")
-            return False
             
         try:
             bucket_name = self.config["bucket_name"]
@@ -260,7 +178,7 @@ class MinioUtils:
             logger.error(f"Error downloading file from MinIO: {err}")
             return None
     
-    def get_file_content(self, object_name: str) -> Optional[bytes]:
+    def get_file_content(self, minio, bucket_name:str, object_name: str) -> Optional[bytes]:
         """
         Get file content from MinIO as bytes
         
@@ -270,15 +188,9 @@ class MinioUtils:
         Returns:
             File content as bytes, or None if error
         """
-        if not self.is_connected():
-            logger.warning("MinIO client not available, skipping file retrieval")
-            return None
-            
         try:
-            bucket_name = self.config["bucket_name"]
-            
             # Get object data
-            response = self.minio_client.get_object(bucket_name, object_name)
+            response = minio.get_object(bucket_name, object_name)
             
             # Read all data
             data = response.read()

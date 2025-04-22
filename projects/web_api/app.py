@@ -59,7 +59,7 @@ logger.info(f"Log level set to {log_level}")
 
 # 初始化数据库和存储工具
 mysql_utils = MySQLUtils(config_loader.get_mysql_config())
-minio_utils = MinioUtils(config_loader.get_minio_config())
+minio_utils = MinioUtils()
 redis_utils = RedisUtils(config_loader.get_redis_config())
 
 # 应用配置
@@ -572,20 +572,9 @@ def get_pdf_from_minio(
         PDF文件的二进制内容，如果发生错误则返回None
     """
     try:
-        # 获取系统初始化的MinIO配置（来自config.yaml）
-        base_config = config_loader.get_minio_config()
 
-        # 否则创建临时连接，使用相同配置但替换bucket_name
-        temp_config = {
-            "endpoint": minio_url,
-            "access_key": minio_access_key,
-            "secret_key": minio_secret_key,
-            "secure": base_config.get("secure", False),
-            "bucket_name": bucket_name  # 动态替换桶名
-        }
-
-        temp_minio = MinioUtils(temp_config)
-        return temp_minio.get_file_content(object_name)
+        minio = Minio(minio_url, access_key=minio_access_key, secret_key=minio_secret_key, secure=False)
+        return minio_utils.get_file_content(minio, bucket_name, object_name)
 
     except Exception as e:
         logger.error(f"Error getting PDF from MinIO: {e}")
@@ -1426,7 +1415,7 @@ async def health_check():
         "timestamp": time.time(),
         "components": {
             "mysql": mysql_utils.db_pool is not None,
-            "minio": minio_utils.minio_client is not None,
+            "minio": True,
             "redis": redis_utils.redis_client is not None  # 添加Redis组件检查
         },
         "details": {}
@@ -1449,17 +1438,6 @@ async def health_check():
         health_data["components"]["mysql"] = False
         health_data["status"] = "degraded"
         health_data["details"]["mysql_error"] = str(e)
-
-    try:
-        if minio_utils.minio_client:
-            minio_utils.minio_client.list_buckets()
-            # 如果成功列出桶，标记为健康
-            health_data["components"]["minio"] = True
-    except Exception as e:
-        logger.error(f"MinIO健康检查失败: {e}")
-        health_data["components"]["minio"] = False
-        health_data["status"] = "degraded"
-        health_data["details"]["minio_error"] = str(e)
 
     # 添加Redis健康检查
     try:
