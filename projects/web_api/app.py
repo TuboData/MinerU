@@ -10,7 +10,6 @@ from datetime import datetime
 import shutil
 import io
 
-import minio
 import uvicorn
 from fastapi import FastAPI, BackgroundTasks, UploadFile, File, Form, HTTPException, Depends, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
@@ -78,6 +77,7 @@ JOBS_COUNT = Gauge('pdf_api_jobs_count', 'Number of jobs by status', ['status'])
 PROCESSING_JOBS = Gauge('pdf_api_processing_jobs', 'Number of jobs currently processing')
 PROCESSING_TIME = Histogram('pdf_api_processing_time_seconds', 'Time taken to process PDFs', ['parse_method'])
 
+
 # 定义任务状态常量
 class JobStatus:
     PENDING = "pending"
@@ -85,11 +85,13 @@ class JobStatus:
     COMPLETED = "completed"
     FAILED = "failed"
 
+
 # 创建初始数据库表
 try:
     mysql_utils.create_tables()
 except Exception as e:
     logger.error(f"Failed to create database tables: {e}")
+
 
 # 定义获取任务信息的工具函数
 def get_job_info(job_id: str) -> Optional[Dict[str, Any]]:
@@ -109,6 +111,7 @@ def get_job_info(job_id: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Error getting job info: {e}")
         return None
+
 
 # 数据写入器
 class MemoryDataWriter(DataWriter):
@@ -132,8 +135,8 @@ class MemoryDataWriter(DataWriter):
 
 
 def init_writers(
-    pdf_file: UploadFile = None,
-    job_id: str = None,
+        pdf_file: UploadFile = None,
+        job_id: str = None,
 ) -> Tuple[
     S3DataWriter,
     S3DataWriter,
@@ -151,31 +154,31 @@ def init_writers(
     # 使用任务ID作为存储路径基础
     storage_base_path = f"jobs/{job_id}" if job_id else "temp"
     image_storage_path = f"{storage_base_path}/images"
-    
+
     # 默认使用MinIO存储
     bucket_name = os.environ.get("MINIO_BUCKET", "pdf-processor")
-    
+
     # 获取MinIO配置
     minio_config = config_loader.get_minio_config()
     ak = minio_config.get("access_key", "minioadmin")
     sk = minio_config.get("secret_key", "minioadmin")
     endpoint_url = minio_config.get("endpoint", "localhost:9000")
-    
+
     # 确保endpoint_url包含协议前缀
     if endpoint_url and not endpoint_url.startswith(('http://', 'https://')):
         secure = minio_config.get("secure", False)
         protocol = "https://" if secure else "http://"
         endpoint_url = f"{protocol}{endpoint_url}"
-    
+
     # 初始化S3数据写入器
     output_writer = S3DataWriter(
-        storage_base_path, 
+        storage_base_path,
         bucket=bucket_name,
         ak=ak,
         sk=sk,
         endpoint_url=endpoint_url
     )
-    
+
     image_writer = S3DataWriter(
         image_storage_path,
         bucket=bucket_name,
@@ -183,7 +186,7 @@ def init_writers(
         sk=sk,
         endpoint_url=endpoint_url
     )
-    
+
     # 处理PDF文件
     if pdf_file:
         pdf_bytes = pdf_file.file.read()
@@ -191,14 +194,14 @@ def init_writers(
         raise HTTPException(
             status_code=400, detail="PDF file must be provided"
         )
-    
+
     return output_writer, image_writer, pdf_bytes
 
 
 def process_pdf(
-    pdf_bytes: bytes,
-    parse_method: str,
-    image_writer: Union[S3DataWriter, FileBasedDataWriter],
+        pdf_bytes: bytes,
+        parse_method: str,
+        image_writer: Union[S3DataWriter, FileBasedDataWriter],
 ) -> Tuple[InferenceResult, PipeResult]:
     """
     Process PDF file content
@@ -239,15 +242,18 @@ def process_pdf(
 
 
 def process_pdf_background(
-    job_id: str,
-    pdf_bytes: bytes,
-    pdf_name: str,
-    parse_method: str = "auto",
-    is_json_md_dump: bool = True,
-    return_layout: bool = True,
-    return_info: bool = True,
-    return_content_list: bool = True,
-    return_images: bool = True,
+        job_id: str,
+        pdf_bytes: bytes,
+        pdf_name: str,
+        parse_method: str = "auto",
+        minio_url: str = None,
+        minio_access_key: str = None,
+        minio_secret_key: str = None,
+        is_json_md_dump: bool = True,
+        return_layout: bool = True,
+        return_info: bool = True,
+        return_content_list: bool = True,
+        return_images: bool = True,
 ):
     """
     后台任务处理PDF文件并将结果保存到MinIO
@@ -266,19 +272,19 @@ def process_pdf_background(
     # 短暂延迟以确保API响应已经返回给客户端
     # 这样可以避免任何潜在的阻塞
     time.sleep(0.2)
-    
+
     try:
         logger.info(f"Background processing started for job {job_id}")
-        
+
         # 先检查任务是否存在
         job_info = mysql_utils.get_job(job_id)
         if not job_info:
             logger.error(f"Cannot process job {job_id}: Job not found in database")
             return
-        
+
         # 更新任务状态为处理中，初始进度为5%
         update_job_progress(job_id, 5.0, JobStatus.PROCESSING)
-        
+
         # 初始化结果字典 - 添加更多关键字段
         result_dict = {
             "job_id": job_id,
@@ -297,43 +303,46 @@ def process_pdf_background(
             },
             "result": {}
         }
-        
+
         # 初始化MinIO数据写入器
         bucket_name = os.environ.get("MINIO_BUCKET", "pdf-processor")
         storage_base_path = f"jobs/{job_id}"
         image_storage_path = f"{storage_base_path}/images"
-        
+
         # 获取MinIO配置
         minio_config = config_loader.get_minio_config()
-        ak = minio_config.get("access_key", "minioadmin")
-        sk = minio_config.get("secret_key", "minioadmin")
-        endpoint_url = minio_config.get("endpoint", "localhost:9000")
+        if not minio_access_key:
+            minio_access_key = minio_config.get("access_key", "minioadmin")
+        if not minio_secret_key:
+            minio_secret_key = minio_config.get("secret_key", "minioadmin")
+        if not minio_url:
+            minio_url = minio_config.get("endpoint", "localhost:9000")
         secure = minio_config.get("secure", False)
 
-        endpoint_with_proxy = endpoint_url
-        # 确保endpoint_url包含协议前缀
+        endpoint_with_proxy = minio_url
+        # 确保minio_url包含协议前缀
         if endpoint_with_proxy and not endpoint_with_proxy.startswith(('http://', 'https://')):
             protocol = "https://" if secure else "http://"
             endpoint_with_proxy = f"{protocol}{endpoint_with_proxy}"
-        
+
         # 创建写入器
         output_writer = S3DataWriter(
-            storage_base_path, 
+            storage_base_path,
             bucket=bucket_name,
-            ak=ak,
-            sk=sk,
-            endpoint_url=endpoint_with_proxy
-        )
-        
-        image_writer = S3DataWriter(
-            image_storage_path, 
-            bucket=bucket_name,
-            ak=ak,
-            sk=sk,
+            ak=minio_access_key,
+            sk=minio_secret_key,
             endpoint_url=endpoint_with_proxy
         )
 
-        minio = Minio(endpoint_url, access_key=ak, secret_key=sk, secure=False)
+        image_writer = S3DataWriter(
+            image_storage_path,
+            bucket=bucket_name,
+            ak=minio_access_key,
+            sk=minio_secret_key,
+            endpoint_url=endpoint_with_proxy
+        )
+
+        minio = Minio(minio_url, access_key=minio_access_key, secret_key=minio_secret_key, secure=False)
         objects = minio.list_objects(bucket_name, storage_base_path, True)
         v = [DeleteObject(i.object_name) for i in objects]
         if len(v) > 0:
@@ -341,10 +350,10 @@ def process_pdf_background(
 
         # 保存原始PDF到MinIO
         output_writer.write(f"{job_id}.pdf", pdf_bytes)
-        
+
         # 更新进度到15% - 准备分析阶段
         update_job_progress(job_id, 15.0)
-        
+
         # 处理PDF
         try:
             logger.info(f"Processing PDF for job {job_id} with method {parse_method}")
@@ -352,32 +361,32 @@ def process_pdf_background(
         except Exception as e:
             logger.warning(f"Job {job_id}: 处理PDF失败: {e}")
             raise e
-        
+
         # 更新进度到50% - PDF处理完成
         update_job_progress(job_id, 50.0)
-        
+
         # 获取模型推理结果（这是一个关键步骤）
         try:
             model_inference_result = infer_result.get_infer_res()
             logger.info(f"Job {job_id}: 成功获取模型推理结果")
             result_dict["result"]["model_inference"] = model_inference_result
-            
+
             # 保存模型推理结果为独立的JSON文件
             model_json_str = json.dumps(model_inference_result, ensure_ascii=False, indent=2, default=str)
             output_writer.write_string(f"{job_id}_model.json", model_json_str)
             logger.info(f"Job {job_id}: 模型推理结果已保存为{job_id}_model.json")
         except Exception as e:
             logger.warning(f"Job {job_id}: 获取模型推理结果失败: {e}")
-        
+
         # 创建临时目录用于保存可视化文件
         temp_dir = f"/tmp/pdf_job_{job_id}"
         os.makedirs(temp_dir, exist_ok=True)
-        
+
         # 绘制模型结果并保存
         try:
             model_pdf_path = os.path.join(temp_dir, f"{job_id}_model.pdf")
             infer_result.draw_model(model_pdf_path)
-            
+
             # 读取生成的文件并上传到MinIO
             if os.path.exists(model_pdf_path):
                 with open(model_pdf_path, 'rb') as f:
@@ -386,12 +395,12 @@ def process_pdf_background(
                     logger.info(f"Job {job_id}: 成功保存模型可视化结果")
         except Exception as e:
             logger.warning(f"Job {job_id}: 绘制模型结果失败: {e}")
-            
+
         # 绘制布局结果并保存
         try:
             layout_pdf_path = os.path.join(temp_dir, f"{job_id}_layout.pdf")
             pipe_result.draw_layout(layout_pdf_path)
-            
+
             # 读取生成的文件并上传到MinIO
             if os.path.exists(layout_pdf_path):
                 with open(layout_pdf_path, 'rb') as f:
@@ -400,7 +409,7 @@ def process_pdf_background(
                     logger.info(f"Job {job_id}: 成功保存布局可视化结果")
         except Exception as e:
             logger.warning(f"Job {job_id}: 绘制布局结果失败: {e}")
-            
+
         # 绘制span结果并保存
         # try:
         #     span_pdf_path = os.path.join(temp_dir, f"{job_id}_spans.pdf")
@@ -414,7 +423,7 @@ def process_pdf_background(
         #             logger.info(f"Job {job_id}: 成功保存span可视化结果")
         # except Exception as e:
         #     logger.warning(f"Job {job_id}: 绘制span结果失败: {e}")
-        
+
         # 清理临时文件
         try:
             if os.path.exists(temp_dir):
@@ -422,7 +431,7 @@ def process_pdf_background(
                 logger.info(f"Job {job_id}: 已清理临时文件目录 {temp_dir}")
         except Exception as e:
             logger.warning(f"Job {job_id}: 清理临时文件失败: {e}")
-            
+
         # 获取中间JSON
         try:
             middle_json_content = pipe_result.get_middle_json()
@@ -434,18 +443,19 @@ def process_pdf_background(
                 logger.info(f"Job {job_id}: 成功保存中间JSON结果")
         except Exception as e:
             logger.warning(f"Job {job_id}: 获取中间JSON失败: {e}")
-            
+
         # 获取内容列表
         image_dir = "images"
         if return_content_list:
             try:
                 content_list = pipe_result.get_content_list(image_dir)
-                output_writer.write_string(f"{job_id}_content_list.json", json.dumps(content_list, ensure_ascii=False, indent=2, default=str))
+                output_writer.write_string(f"{job_id}_content_list.json",
+                                           json.dumps(content_list, ensure_ascii=False, indent=2, default=str))
                 result_dict["result"]["content_list"] = content_list
                 logger.info(f"Job {job_id}: 成功保存内容列表")
             except Exception as e:
                 logger.warning(f"Job {job_id}: 获取内容列表失败: {e}")
-                
+
         # 获取markdown
         # try:
         #     md_content = pipe_result.get_markdown(image_dir)
@@ -454,10 +464,10 @@ def process_pdf_background(
         #     logger.info(f"Job {job_id}: 成功保存Markdown")
         # except Exception as e:
         #     logger.warning(f"Job {job_id}: 获取Markdown失败: {e}")
-        
+
         # 更新进度到70% - 结果提取完成
         update_job_progress(job_id, 70.0)
-        
+
         # 处理图像
         # if return_images and hasattr(infer_result, 'images') and infer_result.images:
         #     # 图像数据直接保存到MinIO并记录
@@ -474,34 +484,34 @@ def process_pdf_background(
         #
         #     # 添加图像信息到结果字典
         #     result_dict["result"]["images"] = images_data
-        
+
         # 更新进度到90% - 图像保存完成
         update_job_progress(job_id, 90.0)
-        
+
         # 记录处理结束时间
         result_dict["processing_time"]["end"] = datetime.now().isoformat()
         result_dict["processing_duration_seconds"] = (
-            datetime.fromisoformat(result_dict["processing_time"]["end"]) - 
-            datetime.fromisoformat(result_dict["processing_time"]["start"])
+                datetime.fromisoformat(result_dict["processing_time"]["end"]) -
+                datetime.fromisoformat(result_dict["processing_time"]["start"])
         ).total_seconds()
-        
+
         # 将主要结果字段保存到MySQL数据库
         mysql_utils.save_pdf_job_result(job_id, result_dict["result"])
-        
+
         # 更新进度到100% - 任务完成
         update_job_progress(job_id, 100.0, JobStatus.COMPLETED)
-        
+
         logger.info(f"PDF processing for job {job_id} completed successfully")
         output_writer.write("finish", bytes([1]))
     except Exception as e:
         logger.error(f"Error processing PDF for job {job_id}: {e}")
         stacktrace = traceback.format_exc()
         logger.error(stacktrace)
-        
+
         # 使用mysql_utils的封装方法保存错误状态
         error_message = str(e)
         mysql_utils.save_pdf_job_error(job_id, error_message)
-        
+
         logger.info(f"Job {job_id} marked as failed due to error: {error_message}")
 
 
@@ -518,30 +528,29 @@ def update_job_progress(job_id: str, progress: float, status: Optional[str] = No
     # 最大尝试次数
     max_retries = 3
     retry_delay = 0.5  # 基础延迟时间（秒）
-    
+
     for attempt in range(max_retries):
         try:
             # 更新Redis中的进度
             redis_utils.update_job_progress(job_id, progress)
-            
+
             # 如果需要更新状态，则更新MySQL中的状态
             if status:
                 update_data = {"status": status}
                 mysql_utils.update_job(job_id, update_data)
                 logger.info(f"Updated job {job_id} status to {status}")
-                
+
             return  # 成功更新，直接返回
-                
+
         except Exception as e:
-            logger.error(f"Error updating job progress (attempt {attempt+1}/{max_retries}): {e}")
-            
+            logger.error(f"Error updating job progress (attempt {attempt + 1}/{max_retries}): {e}")
+
             # 如果不是最后一次尝试，则等待后重试
             if attempt < max_retries - 1:
                 time.sleep(retry_delay * (attempt + 1))
-    
+
     # 如果所有尝试都失败
     logger.error(f"Failed to update job {job_id} progress after {max_retries} attempts")
-
 
 
 def get_pdf_from_minio(bucket_name: str, object_name: str) -> Optional[bytes]:
@@ -584,10 +593,10 @@ def get_pdf_from_minio(bucket_name: str, object_name: str) -> Optional[bytes]:
 @app.middleware("http")
 async def metrics_middleware(request: Request, call_next):
     start_time = time.time()
-    
+
     # 对于异常情况的默认响应
     status_code = 500
-    
+
     try:
         response = await call_next(request)
         status_code = response.status_code
@@ -609,16 +618,17 @@ async def global_exception_handler(request: Request, exc: Exception):
     # 记录错误
     logger.error(f"Global exception: {str(exc)}")
     logger.error(traceback.format_exc())
-    
+
     # 对于HTTP异常，使用标准处理
     if isinstance(exc, HTTPException):
         return await http_exception_handler(request, exc)
-        
+
     # 对于其他异常，返回500错误
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error", "type": str(type(exc).__name__)},
     )
+
 
 # 清理过期任务
 def cleanup_old_jobs(max_age_hours: int = 24):
@@ -634,7 +644,7 @@ def cleanup_old_jobs(max_age_hours: int = 24):
     try:
         current_time = time.time()
         cutoff_time = current_time - (max_age_hours * 3600)
-        
+
         # 从MySQL获取已完成或失败且超过保留时间的任务
         cutoff_date = datetime.fromtimestamp(cutoff_time).strftime('%Y-%m-%d %H:%M:%S')
         query = """
@@ -643,14 +653,14 @@ def cleanup_old_jobs(max_age_hours: int = 24):
         """
         params = (JobStatus.COMPLETED, JobStatus.FAILED, cutoff_date)
         expired_jobs = mysql_utils.execute_query(query, params)
-        
+
         logger.info(f"Found {len(expired_jobs)} expired jobs to clean up (older than {max_age_hours} hours)")
-        
+
         count = 0
         for job in expired_jobs:
             job_id = job.get("id")
             pdf_name = job.get("pdf_name", "unknown")
-            
+
             try:
                 # 先从MinIO删除文件
                 try:
@@ -659,7 +669,7 @@ def cleanup_old_jobs(max_age_hours: int = 24):
                 except Exception as e:
                     logger.warning(f"Failed to delete MinIO files for job {job_id} ({pdf_name}): {e}")
                     # 继续处理，即使MinIO删除失败也尝试删除MySQL记录
-                
+
                 # 然后从MySQL删除任务记录
                 if mysql_utils.delete_job(job_id):
                     logger.info(f"Cleaned up expired job {job_id} ({pdf_name}) from database")
@@ -669,10 +679,10 @@ def cleanup_old_jobs(max_age_hours: int = 24):
             except Exception as e:
                 logger.error(f"Error cleaning up job {job_id} ({pdf_name}): {e}")
                 # 继续处理下一个任务
-            
+
         logger.info(f"Successfully cleaned up {count} expired jobs")
         return count
-        
+
     except Exception as e:
         logger.error(f"Error cleaning up old jobs: {e}")
         logger.exception("Cleanup error details:")
@@ -693,39 +703,39 @@ def get_job_result_from_minio(job_id: str) -> Optional[Dict[str, Any]]:
         # 获取MinIO配置
         bucket_name = os.environ.get("MINIO_BUCKET", "pdf-processor")
         storage_base_path = f"jobs/{job_id}"
-        
+
         minio_config = config_loader.get_minio_config()
         ak = minio_config.get("access_key", "minioadmin")
         sk = minio_config.get("secret_key", "minioadmin")
         endpoint_url = minio_config.get("endpoint", "localhost:9000")
-        
+
         # 确保endpoint_url包含协议前缀
         if endpoint_url and not endpoint_url.startswith(('http://', 'https://')):
             secure = minio_config.get("secure", False)
             protocol = "https://" if secure else "http://"
             endpoint_url = f"{protocol}{endpoint_url}"
-        
+
         # 创建S3DataReader
         reader = S3DataReader(
-            storage_base_path, 
+            storage_base_path,
             bucket=bucket_name,
             ak=ak,
             sk=sk,
             endpoint_url=endpoint_url
         )
-        
+
         # 从字节数据解码JSON字符串的辅助函数
         def decode_json_bytes(json_bytes):
             if not json_bytes:
                 return None
-                
+
             try:
                 json_str = json_bytes.decode('utf-8')
                 return json.loads(json_str)
             except (UnicodeDecodeError, json.JSONDecodeError) as e:
                 logger.error(f"Error decoding JSON: {str(e)}")
                 return None
-        
+
         # 先尝试读取完整结果文件
         try:
             complete_result_bytes = reader.read(f"{job_id}_complete_result.json")
@@ -734,11 +744,11 @@ def get_job_result_from_minio(job_id: str) -> Optional[Dict[str, Any]]:
                 return decode_json_bytes(complete_result_bytes)
         except Exception as e:
             logger.warning(f"Could not read complete result for job {job_id}: {str(e)}")
-        
+
         # 如果没有完整结果，则尝试读取内容列表
         content_list_data = None
         middle_json_data = None
-        
+
         try:
             content_list_bytes = reader.read(f"{job_id}_content_list.json")
             if content_list_bytes:
@@ -747,7 +757,7 @@ def get_job_result_from_minio(job_id: str) -> Optional[Dict[str, Any]]:
                     logger.info(f"Successfully loaded content list for job {job_id}")
         except Exception as e:
             logger.warning(f"Could not read content list for job {job_id}: {str(e)}")
-            
+
         try:
             middle_json_bytes = reader.read(f"{job_id}_middle.json")
             if middle_json_bytes:
@@ -756,13 +766,13 @@ def get_job_result_from_minio(job_id: str) -> Optional[Dict[str, Any]]:
                     logger.info(f"Successfully loaded middle JSON for job {job_id}")
         except Exception as e:
             logger.warning(f"Could not read middle JSON for job {job_id}: {str(e)}")
-            
+
         # 获取基本任务信息
         job_info = mysql_utils.get_job(job_id)
         if not job_info:
             logger.warning(f"Job {job_id} not found in database")
             return None
-        
+
         # 构建结果字典
         result = {
             "job_id": job_id,
@@ -772,23 +782,24 @@ def get_job_result_from_minio(job_id: str) -> Optional[Dict[str, Any]]:
             "completed_at": job_info.get("completed_at", ""),
             "result": {}
         }
-        
+
         # 添加内容列表
         if content_list_data:
             result["result"]["content_list"] = content_list_data
-            
+
         # 添加中间JSON
         if middle_json_data:
             result["result"]["middle_json"] = middle_json_data
-            
+
         if not content_list_data and not middle_json_data:
             logger.error(f"No result content could be loaded for job {job_id}")
-            
+
         return result
-            
+
     except Exception as e:
         logger.exception(f"Error getting job result from MinIO: {str(e)}")
         return None
+
 
 @app.post(
     "/pdf_parse_from_minio",
@@ -800,7 +811,10 @@ async def pdf_parse_from_minio(
         bucket_name: str = Form(...),
         object_name: str = Form(...),
         lang: str = Form(...),
-        job_id: str = Form(...)
+        job_id: str = Form(...),
+        minio_url: str = Form(...),
+        minio_access_key: str = Form(...),
+        minio_secret_key: str = Form(...)
 ):
     """
     处理MinIO中的PDF文件并返回任务ID，用于后续检查状态和获取结果。
@@ -1069,6 +1083,7 @@ async def delete_job(job_id: str, delete_files: bool = True):
         logger.exception(f"Error deleting job {job_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # 批量查询任务状态
 @app.post("/pdf_jobs/status", tags=["projects"], summary="Get status of multiple PDF processing jobs")
 async def get_multiple_job_status(job_ids: List[str]):
@@ -1307,6 +1322,7 @@ async def get_job_image(job_id: str, image_path: str):
         logger.error(error_msg)
         raise HTTPException(status_code=500, detail=error_msg)
 
+
 # 重试功能
 @app.post("/pdf_job/{job_id}/retry", tags=["projects"], summary="Retry a failed PDF processing job")
 async def retry_job(
@@ -1379,7 +1395,6 @@ async def retry_job(
     except Exception as e:
         logger.exception(f"Error retrying job {job_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 
 # 添加定期清理功能的端点
