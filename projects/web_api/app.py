@@ -319,19 +319,20 @@ def process_pdf_background(
             minio_url = minio_config.get("endpoint", "localhost:9000")
         secure = minio_config.get("secure", False)
 
-        endpoint_with_proxy = minio_url
+        endpoint_with_protocol = minio_url
         # 确保minio_url包含协议前缀
-        if endpoint_with_proxy and not endpoint_with_proxy.startswith(('http://', 'https://')):
+        if endpoint_with_protocol and not endpoint_with_protocol.startswith(('http://', 'https://')):
             protocol = "https://" if secure else "http://"
-            endpoint_with_proxy = f"{protocol}{endpoint_with_proxy}"
+            endpoint_with_protocol = f"{protocol}{endpoint_with_protocol}"
 
+        logger.info("minio url: "+ minio_url)
         # 创建写入器
         output_writer = S3DataWriter(
             storage_base_path,
             bucket=bucket_name,
             ak=minio_access_key,
             sk=minio_secret_key,
-            endpoint_url=endpoint_with_proxy
+            endpoint_url=endpoint_with_protocol
         )
 
         image_writer = S3DataWriter(
@@ -339,7 +340,7 @@ def process_pdf_background(
             bucket=bucket_name,
             ak=minio_access_key,
             sk=minio_secret_key,
-            endpoint_url=endpoint_with_proxy
+            endpoint_url=endpoint_with_protocol
         )
 
         minio = Minio(minio_url, access_key=minio_access_key, secret_key=minio_secret_key, secure=False)
