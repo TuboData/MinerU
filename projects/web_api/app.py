@@ -554,7 +554,13 @@ def update_job_progress(job_id: str, progress: float, status: Optional[str] = No
     logger.error(f"Failed to update job {job_id} progress after {max_retries} attempts")
 
 
-def get_pdf_from_minio(bucket_name: str, object_name: str) -> Optional[bytes]:
+def get_pdf_from_minio(
+        bucket_name: str,
+        object_name: str,
+        minio_url: str,
+        minio_access_key: str,
+        minio_secret_key: str
+) -> Optional[bytes]:
     """
     从MinIO中获取PDF文件内容
     
@@ -569,15 +575,11 @@ def get_pdf_from_minio(bucket_name: str, object_name: str) -> Optional[bytes]:
         # 获取系统初始化的MinIO配置（来自config.yaml）
         base_config = config_loader.get_minio_config()
 
-        if bucket_name == base_config.get("bucket_name"):
-            # 使用默认桶时复用全局minio_utils实例
-            return minio_utils.get_file_content(object_name)
-
         # 否则创建临时连接，使用相同配置但替换bucket_name
         temp_config = {
-            "endpoint": base_config["endpoint"],
-            "access_key": base_config["access_key"],
-            "secret_key": base_config["secret_key"],
+            "endpoint": minio_url,
+            "access_key": minio_access_key,
+            "secret_key": minio_secret_key,
             "secure": base_config.get("secure", False),
             "bucket_name": bucket_name  # 动态替换桶名
         }
@@ -832,7 +834,7 @@ async def pdf_parse_from_minio(
     """
     try:
         # 获取文件内容
-        pdf_bytes = get_pdf_from_minio(bucket_name, object_name)
+        pdf_bytes = get_pdf_from_minio(bucket_name, object_name, minio_url, minio_access_key, minio_secret_key)
         if not pdf_bytes:
             raise HTTPException(status_code=404, detail="PDF file not found in MinIO")
 
@@ -861,7 +863,10 @@ async def pdf_parse_from_minio(
             job_id,
             pdf_bytes,
             pdf_name,
-            "auto"
+            "auto",
+            minio_url,
+            minio_access_key,
+            minio_secret_key
         )
 
         logger.info(f"非阻塞任务已创建: {job_id} - 立即返回响应")
