@@ -344,6 +344,7 @@ def process_pdf_background(
         )
 
         minio = Minio(minio_url, access_key=minio_access_key, secret_key=minio_secret_key, secure=False)
+        minio_utils.ensure_bucket_exists(minio, bucket_name)
         objects = minio.list_objects(bucket_name, storage_base_path, True)
         v = [DeleteObject(i.object_name) for i in objects]
         if len(v) > 0:
