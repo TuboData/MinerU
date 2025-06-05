@@ -1,11 +1,19 @@
 {
-    "bucket_info":{
-        "bucket-name-1":["ak", "sk", "endpoint"],
-        "bucket-name-2":["ak", "sk", "endpoint"]
+    "bucket_info": {
+        "bucket-name-1": [
+            "ak",
+            "sk",
+            "endpoint"
+        ],
+        "bucket-name-2": [
+            "ak",
+            "sk",
+            "endpoint"
+        ]
     },
-    "models-dir":"/app/models/miner-u/models",
-    "layoutreader-model-dir":"/app/models/layout-reader",
-    "device-mode":"cuda",
+    "models-dir": "/app/models/miner-u/models",
+    "layoutreader-model-dir": "/app/models/layout-reader",
+    "device-mode": "cuda",
     "layout-config": {
         "model": "doclayout_yolo"
     },
@@ -22,23 +30,23 @@
     },
     "llm-aided-config": {
         "formula_aided": {
-            "api_key": "sk-322f3d6172254c86808e773de55b5a28",
+            "api_key": "your_api_key",
             "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
             "model": "qwen2.5-7b-instruct",
             "enable": false
         },
         "text_aided": {
-            "api_key": "sk-322f3d6172254c86808e773de55b5a28",
+            "api_key": "your_api_key",
             "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
             "model": "qwen2.5-7b-instruct",
             "enable": false
         },
         "title_aided": {
-            "api_key": "sk-322f3d6172254c86808e773de55b5a28",
+            "api_key": "your_api_key",
             "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
             "model": "qwen2.5-32b-instruct",
             "enable": false
         }
     },
-    "config_version": "1.1.1"
+    "config_version": "1.2.0"
 }

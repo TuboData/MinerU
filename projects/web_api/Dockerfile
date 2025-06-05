@@ -50,23 +50,10 @@ RUN apt-get update && \
 #ADD .venv/bin/ venv/bin-back/
 #RUN mv venv/bin-back/* venv/bin/
 
-COPY requirements.txt .
-RUN grep -v "detectron2" requirements.txt > requirements_without_detectron2.txt
-RUN python -m venv /app/venv && \
-    . /app/venv/bin/activate && \
-    pip config set global.index-url https://mirrors.aliyun.com/pypi/simple && \
-    pip config set global.trusted-host mirrors.aliyun.com && \
-    pip install torch==2.3.1 torchvision==0.18.1 numpy pillow  && \
-    pip install -r requirements_without_detectron2.txt
-
-RUN . /app/venv/bin/activate \
-    && pip install --no-build-isolation git+https://github.com/facebookresearch/detectron2.git@9604f5995cc628619f0e4fd913453b4d7d61db3f
-
-
-
-RUN . /app/venv/bin/activate \
-    && pip uninstall -y paddlepaddle \
-    && pip install -i https://www.paddlepaddle.org.cn/packages/stable/cu118/ paddlepaddle-gpu==3.0.0rc1
+COPY pyproject.toml uv.lock ./
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+RUN --mount=type=cache,id=ragflow_uv,target=/root/.cache/uv,sharing=locked \
+    ../root/.local/bin/uv sync
 
 # COPY models
 ADD models/ models/
