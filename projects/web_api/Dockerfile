@@ -12,7 +12,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 FROM base AS build
 
-RUN sed -i 's|http://archive.ubuntu.com|https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list;
+RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.ustc.edu.cn@g' /etc/apt/sources.list
 
 # Update the package list and install necessary packages
 RUN apt-get update && \
@@ -51,10 +51,15 @@ RUN apt-get update && \
 #RUN mv venv/bin-back/* venv/bin/
 
 COPY pyproject.toml uv.lock ./
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-RUN --mount=type=cache,id=ragflow_uv,target=/root/.cache/uv,sharing=locked \
-    ../root/.local/bin/uv sync
 
+RUN export http_proxy='http://10.147.16.63:7890'; \
+    export https_proxy='http://10.147.16.63:7890'; \
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+
+RUN ../root/.local/bin/uv sync
+
+ENV http_proxy=''
+ENV https_proxy=''
 # COPY models
 ADD models/ models/
 #COPY download_models.py .
@@ -77,6 +82,7 @@ COPY entrypoint.sh /app/entrypoint.sh
 COPY docker/magic-pdf.json /root/magic-pdf.json
 COPY app.py /app/app.py
 COPY utils/ /app/utils/
+COPY tubo_marker_pdf/ /app/tubo_marker_pdf/
 
 # Expose the port that FastAPI will run on
 EXPOSE 8000
