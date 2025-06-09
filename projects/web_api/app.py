@@ -13,7 +13,6 @@ import io
 import uvicorn
 from fastapi import FastAPI, BackgroundTasks, UploadFile, File, Form, HTTPException, Depends, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
-from loguru import logger
 from minio.deleteobjects import DeleteObject
 from prometheus_client import Counter, Histogram, Gauge, generate_latest
 import traceback
@@ -31,6 +30,7 @@ from magic_pdf.model.doc_analyze_by_custom_model import doc_analyze
 from magic_pdf.operators.models import InferenceResult
 from magic_pdf.operators.pipes import PipeResult
 
+from tubo_marker_pdf.MarkerPdf import MarkerPdf
 # 导入工具类和配置加载器
 from utils.mysql_utils import MySQLUtils
 from utils.minio_utils import MinioUtils
@@ -325,7 +325,7 @@ def process_pdf_background(
             protocol = "https://" if secure else "http://"
             endpoint_with_protocol = f"{protocol}{endpoint_with_protocol}"
 
-        logger.info("minio url: "+ minio_url)
+        logger.info("minio url: " + minio_url)
         # 创建写入器
         output_writer = S3DataWriter(
             storage_base_path,
@@ -555,33 +555,6 @@ def update_job_progress(job_id: str, progress: float, status: Optional[str] = No
     logger.error(f"Failed to update job {job_id} progress after {max_retries} attempts")
 
 
-def get_pdf_from_minio(
-        bucket_name: str,
-        object_name: str,
-        minio_url: str,
-        minio_access_key: str,
-        minio_secret_key: str
-) -> Optional[bytes]:
-    """
-    从MinIO中获取PDF文件内容
-    
-    Args:
-        bucket_name: MinIO存储桶名称
-        object_name: MinIO对象名称
-        
-    Returns:
-        PDF文件的二进制内容，如果发生错误则返回None
-    """
-    try:
-
-        minio = Minio(minio_url, access_key=minio_access_key, secret_key=minio_secret_key, secure=False)
-        return minio_utils.get_file_content(minio, bucket_name, object_name)
-
-    except Exception as e:
-        logger.error(f"Error getting PDF from MinIO: {e}")
-        return None
-
-
 # 请求中间件 - 记录请求信息
 @app.middleware("http")
 async def metrics_middleware(request: Request, call_next):
@@ -795,6 +768,20 @@ def get_job_result_from_minio(job_id: str) -> Optional[Dict[str, Any]]:
 
 
 @app.post(
+    "/fast-pdf-md",
+    tags=["projects"],
+    summary="Parse PDF files stored in MinIO",
+)
+async def fast_pdf_md(
+        pdf_id: str = Form(...),
+        minio_url: str = Form(...),
+        minio_access_key: str = Form(...),
+        minio_secret_key: str = Form(...)
+) -> str:
+    return MarkerPdf.handle(pdf_id, minio_url, minio_access_key, minio_secret_key)
+
+
+@app.post(
     "/pdf_parse_from_minio",
     tags=["projects"],
     summary="Parse PDF files stored in MinIO",
@@ -824,7 +811,8 @@ async def pdf_parse_from_minio(
     """
     try:
         # 获取文件内容
-        pdf_bytes = get_pdf_from_minio(bucket_name, object_name, minio_url, minio_access_key, minio_secret_key)
+        pdf_bytes = minio_utils.get_pdf_from_minio(bucket_name, object_name, minio_url, minio_access_key,
+                                                   minio_secret_key)
         if not pdf_bytes:
             raise HTTPException(status_code=404, detail="PDF file not found in MinIO")
 

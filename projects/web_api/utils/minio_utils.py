@@ -14,7 +14,33 @@ from minio.error import S3Error
 
 logger = logging.getLogger(__name__)
 
+
 class MinioUtils:
+    def get_pdf_from_minio(self,
+                           bucket_name: str,
+                           object_name: str,
+                           minio_url: str,
+                           minio_access_key: str,
+                           minio_secret_key: str
+                           ) -> Optional[bytes]:
+        """
+        从MinIO中获取PDF文件内容
+
+        Args:
+            bucket_name: MinIO存储桶名称
+            object_name: MinIO对象名称
+
+        Returns:
+            PDF文件的二进制内容，如果发生错误则返回None
+        """
+        try:
+            minio = Minio(minio_url, access_key=minio_access_key, secret_key=minio_secret_key, secure=False)
+            return self.get_file_content(minio, bucket_name, object_name)
+
+        except Exception as e:
+            logger.error(f"Error getting PDF from MinIO: {e}")
+            return None
+
     def ensure_bucket_exists(self, minio, bucket_name: str) -> bool:
         """
         Ensure the bucket exists, create it if necessary
@@ -25,7 +51,7 @@ class MinioUtils:
         Returns:
             True if bucket exists or was created, False on error
         """
-            
+
         try:
             if not minio.bucket_exists(bucket_name):
                 minio.make_bucket(bucket_name)
@@ -34,7 +60,7 @@ class MinioUtils:
         except S3Error as err:
             logger.error(f"Error ensuring bucket exists: {err}")
             return False
-    
+
     def upload_file(self, minio, local_path: str, object_name: Optional[str] = None) -> Optional[str]:
         """
         Upload file to MinIO
@@ -46,27 +72,27 @@ class MinioUtils:
         Returns:
             Object name if uploaded successfully, None otherwise
         """
-            
+
         try:
             bucket_name = self.config["bucket_name"]
-            
+
             # Use filename as object name if not provided
             if object_name is None:
                 object_name = os.path.basename(local_path)
-                
+
             minio.fput_object(
                 bucket_name,
                 object_name,
                 local_path,
             )
-            
+
             logger.info(f"Uploaded {local_path} to MinIO as {object_name}")
             return object_name
-            
+
         except S3Error as err:
             logger.error(f"Error uploading to MinIO: {err}")
             return None
-    
+
     def upload_bytes(self, data: bytes, object_name: str, content_type: str = "application/octet-stream") -> bool:
         """
         Upload bytes data to MinIO
@@ -79,13 +105,13 @@ class MinioUtils:
         Returns:
             True if uploaded successfully, False otherwise
         """
-            
+
         try:
             bucket_name = self.config["bucket_name"]
-            
+
             # Convert bytes to file-like object
             data_stream = io.BytesIO(data)
-            
+
             self.minio_client.put_object(
                 bucket_name,
                 object_name,
@@ -93,14 +119,14 @@ class MinioUtils:
                 length=len(data),
                 content_type=content_type
             )
-            
+
             logger.info(f"Uploaded bytes data to MinIO as {object_name}")
             return True
-            
+
         except S3Error as err:
             logger.error(f"Error uploading bytes to MinIO: {err}")
             return False
-    
+
     def upload_directory(self, local_dir: str, prefix: str = "") -> List[str]:
         """
         Upload entire directory to MinIO
@@ -115,33 +141,33 @@ class MinioUtils:
         if not self.is_connected():
             logger.warning("MinIO client not available, skipping directory upload")
             return []
-            
+
         uploaded_objects = []
-        
+
         try:
             # Walk through directory
             for root, _, files in os.walk(local_dir):
                 for file in files:
                     # Get full file path
                     file_path = os.path.join(root, file)
-                    
+
                     # Calculate relative path from local_dir
                     rel_path = os.path.relpath(file_path, local_dir)
-                    
+
                     # Create object name with prefix
                     object_name = os.path.join(prefix, rel_path).replace("\\", "/")
-                    
+
                     # Upload file
                     result = self.upload_file(file_path, object_name)
                     if result:
                         uploaded_objects.append(result)
-                        
+
             return uploaded_objects
-            
+
         except Exception as err:
             logger.error(f"Error uploading directory to MinIO: {err}")
             return uploaded_objects
-    
+
     def download_file(self, object_name: str, local_path: Optional[str] = None) -> Optional[str]:
         """
         Download file from MinIO
@@ -156,29 +182,29 @@ class MinioUtils:
         if not self.is_connected():
             logger.warning("MinIO client not available, skipping download")
             return None
-            
+
         try:
             bucket_name = self.config["bucket_name"]
-            
+
             # Generate temporary file path if not provided
             if local_path is None:
                 filename = os.path.basename(object_name)
                 local_path = f"/tmp/{uuid.uuid4()}_{filename}"
-                
+
             # Create directory if it doesn't exist
             os.makedirs(os.path.dirname(os.path.abspath(local_path)), exist_ok=True)
-            
+
             # Download object
             self.minio_client.fget_object(bucket_name, object_name, local_path)
-            
+
             logger.info(f"Downloaded {object_name} from MinIO to {local_path}")
             return local_path
-            
+
         except S3Error as err:
             logger.error(f"Error downloading file from MinIO: {err}")
             return None
-    
-    def get_file_content(self, minio, bucket_name:str, object_name: str) -> Optional[bytes]:
+
+    def get_file_content(self, minio, bucket_name: str, object_name: str) -> Optional[bytes]:
         """
         Get file content from MinIO as bytes
         
@@ -191,21 +217,21 @@ class MinioUtils:
         try:
             # Get object data
             response = minio.get_object(bucket_name, object_name)
-            
+
             # Read all data
             data = response.read()
             response.close()
             response.release_conn()
-            
+
             return data
-            
+
         except S3Error as err:
             logger.error(f"S3 error getting file content: {err}")
             return None
         except Exception as err:
             logger.error(f"Error getting file content: {err}")
             return None
-            
+
     def get_file(self, object_name: str) -> Optional[str]:
         """
         Get file content from MinIO as string
@@ -219,13 +245,13 @@ class MinioUtils:
         data = self.get_file_content(object_name)
         if data is None:
             return None
-            
+
         try:
             return data.decode('utf-8')
         except UnicodeDecodeError:
             logger.error(f"Error decoding file {object_name} as UTF-8")
             return None
-    
+
     def list_objects(self, prefix: str = "", recursive: bool = True) -> List[str]:
         """
         List objects in MinIO bucket
@@ -240,19 +266,19 @@ class MinioUtils:
         if not self.is_connected():
             logger.warning("MinIO client not available, skipping object listing")
             return []
-            
+
         try:
             bucket_name = self.config["bucket_name"]
-            
+
             objects = self.minio_client.list_objects(bucket_name, prefix=prefix, recursive=recursive)
             result = [obj.object_name for obj in objects]
-            
+
             return result
-            
+
         except S3Error as err:
             logger.error(f"Error listing objects in MinIO: {err}")
             return []
-    
+
     def delete_object(self, object_name: str) -> bool:
         """
         Delete object from MinIO
@@ -266,19 +292,19 @@ class MinioUtils:
         if not self.is_connected():
             logger.warning("MinIO client not available, skipping object deletion")
             return False
-            
+
         try:
             bucket_name = self.config["bucket_name"]
-            
+
             self.minio_client.remove_object(bucket_name, object_name)
-            
+
             logger.info(f"Deleted object {object_name} from MinIO")
             return True
-            
+
         except S3Error as err:
             logger.error(f"Error deleting object from MinIO: {err}")
             return False
-    
+
     def delete_directory(self, prefix: str) -> bool:
         """
         Delete directory (all objects with prefix) from MinIO
@@ -292,21 +318,21 @@ class MinioUtils:
         if not self.is_connected():
             logger.warning("MinIO client not available, skipping directory deletion")
             return False
-            
+
         try:
             bucket_name = self.config["bucket_name"]
             logger.info(f"Starting deletion of objects with prefix '{prefix}' in bucket '{bucket_name}'")
-            
+
             # 验证bucket是否存在
             if not self.minio_client.bucket_exists(bucket_name):
                 logger.error(f"Bucket '{bucket_name}' does not exist")
                 return False
-                
+
             # 确保前缀以 '/' 结尾，这样才能正确匹配目录
             if not prefix.endswith('/') and '.' not in Path(prefix).name:  # 非文件路径应该以/结尾
                 prefix = f"{prefix}/"
                 logger.info(f"Adjusted prefix to '{prefix}' for directory matching")
-            
+
             # 获取对象列表
             try:
                 objects_iter = self.minio_client.list_objects(bucket_name, prefix=prefix, recursive=True)
@@ -315,15 +341,15 @@ class MinioUtils:
             except Exception as list_err:
                 logger.error(f"Error listing objects with prefix '{prefix}': {list_err}")
                 return False
-            
+
             if not objects:
                 logger.info(f"No objects found with prefix '{prefix}'")
                 return True  # 没有对象需要删除，视为成功
-            
+
             # 准备删除对象
             delete_errors = []
             success_count = 0
-            
+
             # 使用删除单个对象的方法来确保每个对象都被处理
             for obj in objects:
                 try:
@@ -334,11 +360,11 @@ class MinioUtils:
                         # 跳过无法识别的对象
                         logger.warning(f"Skipping object of type {type(obj)}: {obj}")
                         continue
-                        
+
                     # 执行删除
                     self.minio_client.remove_object(bucket_name, obj_name)
                     success_count += 1
-                    
+
                     # 验证删除是否成功
                     try:
                         self.minio_client.stat_object(bucket_name, obj_name)
@@ -352,25 +378,26 @@ class MinioUtils:
                     error_msg = f"{obj.object_name if hasattr(obj, 'object_name') else 'unknown'}: {str(del_err)}"
                     delete_errors.append(error_msg)
                     logger.error(f"Failed to delete object: {error_msg}")
-            
+
             # 记录删除结果
             if delete_errors:
                 error_sample = delete_errors[:5]
-                logger.error(f"Failed to delete {len(delete_errors)}/{len(objects)} objects: {', '.join(error_sample)}" +
-                            ("..." if len(delete_errors) > 5 else ""))
-            
+                logger.error(
+                    f"Failed to delete {len(delete_errors)}/{len(objects)} objects: {', '.join(error_sample)}" +
+                    ("..." if len(delete_errors) > 5 else ""))
+
             logger.info(f"Successfully deleted {success_count}/{len(objects)} objects with prefix '{prefix}'")
-            
+
             # 只有全部删除成功才返回True
             return success_count == len(objects)
-            
+
         except S3Error as err:
             logger.error(f"S3Error while deleting directory from MinIO: {err}")
             return False
         except Exception as e:
             logger.error(f"Unexpected error deleting directory from MinIO: {str(e)}")
             return False
-    
+
     def object_exists(self, object_name: str) -> bool:
         """
         Check if object exists in MinIO
@@ -384,23 +411,23 @@ class MinioUtils:
         if not self.is_connected():
             logger.warning("MinIO client not available, skipping object check")
             return False
-            
+
         try:
             bucket_name = self.config["bucket_name"]
-            
+
             # Try to get object stats, will raise exception if object doesn't exist
             self.minio_client.stat_object(bucket_name, object_name)
             return True
-            
+
         except S3Error:
             return False
-    
+
     def close(self) -> None:
         """Close the MinIO connection"""
         # MinIO client doesn't require explicit closing
         self.minio_client = None
         logger.info("MinIO connection closed")
-        
+
     def get_job_files(self, job_id: str) -> List[str]:
         """
         获取指定任务ID的所有相关文件信息
@@ -414,16 +441,16 @@ class MinioUtils:
         if not self.is_connected():
             logger.warning("MinIO client not available, skipping file query")
             return {}
-            
+
         try:
             bucket_name = self.config["bucket_name"]
             prefix = f"jobs/{job_id}"
-            
+
             # 获取所有对象
             objects = list(self.minio_client.list_objects(bucket_name, prefix=prefix, recursive=True))
             logger.info(f"Found {len(objects)} objects for job {job_id}")
             return objects
-            
+
         except Exception as e:
             logger.error(f"Error getting job files from MinIO: {str(e)}")
-            return {} 
+            return {}
