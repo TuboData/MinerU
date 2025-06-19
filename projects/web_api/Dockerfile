@@ -56,12 +56,13 @@ RUN export http_proxy='http://10.147.16.63:7890'; \
     export https_proxy='http://10.147.16.63:7890'; \
     curl -LsSf https://astral.sh/uv/install.sh | sh
 
-RUN ../root/.local/bin/uv sync
+RUN ../root/.local/bin/uv sync; \
+    rm -rf /root/.cache/uv
 
 ENV http_proxy=''
 ENV https_proxy=''
 # COPY models
-ADD models/ models/
+ADD models/miner-u/ models/
 #COPY download_models.py .
 #RUN . /app/venv/bin/activate && \
 #    python ./download_models.py
@@ -83,7 +84,7 @@ COPY docker/magic-pdf.json /root/magic-pdf.json
 COPY app.py /app/app.py
 COPY utils/ /app/utils/
 COPY tubo_marker_pdf/ /app/tubo_marker_pdf/
-
+ADD models/marker/ /home/tubo/.cache/datalab/models/
 # Expose the port that FastAPI will run on
 EXPOSE 8000
 
