@@ -69,8 +69,7 @@ ADD models/miner-u/ models/
 
 
 # Create volume for paddleocr models
-RUN mkdir -p /root/.paddleocr
-VOLUME [ "/root/.paddleocr" ]
+ADD models/paddleocr/ /root/.paddleocr/
 
 # Create directories for application
 RUN mkdir -p /app/utils /app/tests
@@ -84,7 +83,7 @@ COPY docker/magic-pdf.json /root/magic-pdf.json
 COPY app.py /app/app.py
 COPY utils/ /app/utils/
 COPY tubo_marker_pdf/ /app/tubo_marker_pdf/
-ADD models/marker/ /home/tubo/.cache/datalab/models/
+ADD models/marker/ /root/.cache/datalab/models/
 # Expose the port that FastAPI will run on
 EXPOSE 8000
 
