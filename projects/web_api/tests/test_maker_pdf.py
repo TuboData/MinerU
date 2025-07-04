@@ -1,12 +1,12 @@
 from six import BytesIO
 
-from docker.tubo_marker_pdf import MarkerPdf
+from busi.tubo_marker_doc.marker_doc import MarkerDoc
 
 
 def test():
     file = open('../demo1.pdf', 'rb')
 
-    md = MarkerPdf._doHandle(BytesIO(file.read()))
+    md = MarkerDoc._do_handle(BytesIO(file.read()))
     print(md)
 
 if __name__ == '__main__':

@@ -30,7 +30,7 @@ from magic_pdf.model.doc_analyze_by_custom_model import doc_analyze
 from magic_pdf.operators.models import InferenceResult
 from magic_pdf.operators.pipes import PipeResult
 
-from busi.tubo_marker_doc import MarkerDoc
+from busi.tubo_marker_doc.marker_doc import MarkerDoc
 # 导入工具类和配置加载器
 from utils.mysql_utils import MySQLUtils
 from utils.minio_utils import MinioUtils
@@ -779,7 +779,20 @@ async def fast_file_md(
         minio_access_key: str = Form(...),
         minio_secret_key: str = Form(...)
 ) -> str:
-    return MarkerPdf.handle(bucket_name, folder_path, minio_url, minio_access_key, minio_secret_key)
+    return MarkerDoc.handle(bucket_name, folder_path, minio_url, minio_access_key, minio_secret_key)
+
+@app.post(
+    "/fast-pdf-md",
+    tags=["projects"],
+    summary="Parse PDF files stored in MinIO",
+)
+async def fast_pdf_md(
+        file_id: str = Form(...),
+        minio_url: str = Form(...),
+        minio_access_key: str = Form(...),
+        minio_secret_key: str = Form(...)
+) -> str:
+    return MarkerDoc.handle("fast-pdf-md", file_id, minio_url, minio_access_key, minio_secret_key)
 
 
 @app.post(
