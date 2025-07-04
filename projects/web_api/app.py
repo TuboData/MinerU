@@ -11,7 +11,7 @@ import shutil
 import io
 
 import uvicorn
-from fastapi import FastAPI, BackgroundTasks, UploadFile, File, Form, HTTPException, Depends, Query, Request
+from fastapi import FastAPI, BackgroundTasks, UploadFile, File, Form, HTTPException, Query
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from minio.deleteobjects import DeleteObject
 from prometheus_client import Counter, Histogram, Gauge, generate_latest
@@ -30,7 +30,7 @@ from magic_pdf.model.doc_analyze_by_custom_model import doc_analyze
 from magic_pdf.operators.models import InferenceResult
 from magic_pdf.operators.pipes import PipeResult
 
-from tubo_marker_pdf.MarkerPdf import MarkerPdf
+from busi.tubo_marker_pdf.MarkerPdf import MarkerPdf
 # 导入工具类和配置加载器
 from utils.mysql_utils import MySQLUtils
 from utils.minio_utils import MinioUtils
@@ -1487,4 +1487,4 @@ async def metrics():
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8002)

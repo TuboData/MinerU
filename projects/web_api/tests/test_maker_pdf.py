@@ -1,6 +1,6 @@
 from six import BytesIO
 
-from tubo_marker_pdf.MarkerPdf import MarkerPdf
+from busi.tubo_marker_pdf.MarkerPdf import MarkerPdf
 
 
 def test():

@@ -57,19 +57,21 @@ RUN export http_proxy='http://10.147.16.63:7890'; \
     curl -LsSf https://astral.sh/uv/install.sh | sh
 
 RUN ../root/.local/bin/uv sync; \
+    ../root/.local/bin/uv pip install marker-pdf; \
+    ../root/.local/bin/uv pip install mineru; \
     rm -rf /root/.cache/uv
 
 ENV http_proxy=''
 ENV https_proxy=''
 # COPY models
-ADD models/miner-u/ models/
+
 #COPY download_models.py .
 #RUN . /app/venv/bin/activate && \
 #    python ./download_models.py
 
 
 # Create volume for paddleocr models
-ADD models/paddleocr/ /root/.paddleocr/
+# ADD models/paddleocr/ /root/.paddleocr/
 
 # Create directories for application
 RUN mkdir -p /app/utils /app/tests
@@ -79,11 +81,16 @@ COPY config.yaml /app/config.yaml
 
 # Copy the app and its utilities
 COPY entrypoint.sh /app/entrypoint.sh
-COPY docker/magic-pdf.json /root/magic-pdf.json
+# ADD models/miner-u/ models/
+# COPY docker/magic-pdf.json /root/magic-pdf.json
 COPY app.py /app/app.py
 COPY utils/ /app/utils/
-COPY tubo_marker_pdf/ /app/tubo_marker_pdf/
+COPY busi/ /app/busi/
+
 ADD models/marker/ /root/.cache/datalab/models/
+
+RUN . /app/.venv/bin/activate; \
+    mineru-models-download -s modelscope -m all
 # Expose the port that FastAPI will run on
 EXPOSE 8000
 
