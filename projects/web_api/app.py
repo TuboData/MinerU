@@ -11,7 +11,7 @@ import shutil
 import io
 
 import uvicorn
-from fastapi import FastAPI, BackgroundTasks, UploadFile, File, Form, HTTPException, Depends, Query, Request
+from fastapi import FastAPI, BackgroundTasks, UploadFile, File, Form, HTTPException, Query
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from minio.deleteobjects import DeleteObject
 from prometheus_client import Counter, Histogram, Gauge, generate_latest
@@ -30,7 +30,7 @@ from magic_pdf.model.doc_analyze_by_custom_model import doc_analyze
 from magic_pdf.operators.models import InferenceResult
 from magic_pdf.operators.pipes import PipeResult
 
-from tubo_marker_pdf.MarkerPdf import MarkerPdf
+from busi.tubo_marker_doc import MarkerPdf
 # 导入工具类和配置加载器
 from utils.mysql_utils import MySQLUtils
 from utils.minio_utils import MinioUtils
@@ -768,17 +768,18 @@ def get_job_result_from_minio(job_id: str) -> Optional[Dict[str, Any]]:
 
 
 @app.post(
-    "/fast-pdf-md",
+    "/fast-file-md",
     tags=["projects"],
     summary="Parse PDF files stored in MinIO",
 )
-async def fast_pdf_md(
-        pdf_id: str = Form(...),
+async def fast_file_md(
+        bucket_name: str = Form(...),
+        folder_path: str = Form(...),
         minio_url: str = Form(...),
         minio_access_key: str = Form(...),
         minio_secret_key: str = Form(...)
 ) -> str:
-    return MarkerPdf.handle(pdf_id, minio_url, minio_access_key, minio_secret_key)
+    return MarkerPdf.handle(bucket_name, folder_path, minio_url, minio_access_key, minio_secret_key)
 
 
 @app.post(
