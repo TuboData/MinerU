@@ -24,7 +24,7 @@ class MarkerDoc(object):
         minio_utils.ensure_bucket_exists(minio, bucket_name)
         pdf_path = f"{folder_path}/src.pdf"
         pdf_bytes = minio_utils.get_file_content(minio, bucket_name, pdf_path)
-        result_md = MarkerDoc.__do_handle(BytesIO(pdf_bytes))
+        result_md = MarkerDoc._do_handle(BytesIO(pdf_bytes))
         logger.info(f"{folder_path} marker finished: markdown length: {len(result_md)}")
         md_path = f"{folder_path}/marker.md"
         try:
