@@ -21,7 +21,7 @@ dependencies = [
     "prometheus-client>=0.21.1",
     "pycocotools>=2.0.8",
     "python-multipart>=0.0.20",
-    "rapid-table>=1.0.5",
+    "rapid-table==1.0.5",
     "redis>=5.2.1",
     "setuptools>=76.0.0",
     "torch>=2.7.0",

@@ -459,13 +459,13 @@ def process_pdf_background(
                 logger.warning(f"Job {job_id}: 获取内容列表失败: {e}")
 
         # 获取markdown
-        # try:
-        #     md_content = pipe_result.get_markdown(image_dir)
-        #     output_writer.write_string(f"{job_id}.md", md_content)
-        #     result_dict["result"]["markdown"] = md_content
-        #     logger.info(f"Job {job_id}: 成功保存Markdown")
-        # except Exception as e:
-        #     logger.warning(f"Job {job_id}: 获取Markdown失败: {e}")
+        try:
+            md_content = pipe_result.get_markdown(image_dir)
+            output_writer.write_string(f"{job_id}.md", md_content)
+            result_dict["result"]["markdown"] = md_content
+            logger.info(f"Job {job_id}: 成功保存Markdown")
+        except Exception as e:
+            logger.warning(f"Job {job_id}: 获取Markdown失败: {e}")
 
         # 更新进度到70% - 结果提取完成
         update_job_progress(job_id, 70.0)
@@ -1501,4 +1501,4 @@ async def metrics():
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

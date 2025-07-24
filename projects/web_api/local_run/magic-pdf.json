@@ -11,8 +11,8 @@
             "endpoint"
         ]
     },
-    "models-dir": "models/miner-u/models",
-    "layoutreader-model-dir": "models/layout-reader",
+    "models-dir": "models/miner-u/miner-u/models",
+    "layoutreader-model-dir": "models/miner-u/layout-reader",
     "device-mode": "cuda",
     "layout-config": {
         "model": "doclayout_yolo"
