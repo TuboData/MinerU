@@ -1,16 +1,17 @@
 import os
-import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 
 
 class DocHelper:
+    image_type_set = {".jpg", ".jpeg", ".png", ".gif", ".bmp"}
+    miner_u_supported_type_set = set(image_type_set.union(".pdf"))
     @staticmethod
     def ensure_bytes_pdf(file_name, doc_bytes):
         base, ext = os.path.splitext(file_name)
         ext = ext.lower()
-        if ext == '.pdf':
+        if ext in DocHelper.miner_u_supported_type_set:
             return doc_bytes
         elif ext in ('.doc', '.docx'):
             return DocHelper.__convert_word_bytes_to_pdf(doc_bytes, ext)

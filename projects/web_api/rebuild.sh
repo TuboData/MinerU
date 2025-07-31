@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sudo docker build -f Dockerfile -t tubo-pdf:latest .
+sudo docker build -f Dockerfile --no-cache -t tubo-pdf:latest .
 sudo docker stop tubo-pdf
 sudo docker rm tubo-pdf
 # sudo docker run -d --name tubo-pdf -p 8000:8000 --restart always tubo-pdf:latest

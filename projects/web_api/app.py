@@ -25,7 +25,7 @@ import magic_pdf.model as model_config
 from magic_pdf.config.enums import SupportedPdfParseMethod
 from magic_pdf.data.data_reader_writer import DataWriter, FileBasedDataWriter
 from magic_pdf.data.data_reader_writer.s3 import S3DataReader, S3DataWriter
-from magic_pdf.data.dataset import PymuDocDataset
+from magic_pdf.data.dataset import PymuDocDataset, ImageDataset
 from magic_pdf.model.doc_analyze_by_custom_model import doc_analyze
 from magic_pdf.operators.models import InferenceResult
 from magic_pdf.operators.pipes import PipeResult
@@ -203,6 +203,7 @@ def process_pdf(
         pdf_bytes: bytes,
         parse_method: str,
         image_writer: Union[S3DataWriter, FileBasedDataWriter],
+        file_name: str
 ) -> Tuple[InferenceResult, PipeResult]:
     """
     Process PDF file content
@@ -215,7 +216,12 @@ def process_pdf(
     Returns:
         Tuple[InferenceResult, PipeResult]: Returns inference result and pipeline result
     """
-    ds = PymuDocDataset(pdf_bytes)
+    base, ext = os.path.splitext(file_name)
+    ext = ext.lower()
+    if ext == ".pdf":
+        ds = PymuDocDataset(pdf_bytes)
+    else:
+        ds = ImageDataset(pdf_bytes)
     infer_result: InferenceResult = None
     pipe_result: PipeResult = None
 
@@ -233,7 +239,7 @@ def process_pdf(
             infer_result = ds.apply(doc_analyze, ocr=False)
             pipe_result = infer_result.pipe_txt_mode(image_writer)
 
-    return infer_result, pipe_result
+    return infer_result, pipe_result, ds
 
 
 # def encode_image(image_path: str) -> str:
@@ -352,8 +358,7 @@ def process_pdf_background(
         if len(v) > 0:
             minio.remove_objects(bucket_name, v)
 
-        # 保存原始PDF到MinIO
-        output_writer.write(f"{job_id}.pdf", pdf_bytes)
+
 
         # 更新进度到15% - 准备分析阶段
         update_job_progress(job_id, 15.0)
@@ -361,10 +366,16 @@ def process_pdf_background(
         # 处理PDF
         try:
             logger.info(f"Processing DOC for job {job_id} with method {parse_method}")
-            infer_result, pipe_result = process_pdf(pdf_bytes, parse_method, image_writer)
+            infer_result, pipe_result, ds = process_pdf(pdf_bytes, parse_method, image_writer, pdf_name)
         except Exception as e:
             logger.warning(f"Job {job_id}: 处理PDF失败: {e}")
             raise e
+
+        # 保存原始PDF到MinIO
+        if isinstance(ds, ImageDataset):
+            output_writer.write(f"{job_id}.pdf", ds._data_bits)
+        else:
+            output_writer.write(f"{job_id}.pdf", pdf_bytes)
 
         # 更新进度到50% - DOC处理完成
         update_job_progress(job_id, 50.0)
