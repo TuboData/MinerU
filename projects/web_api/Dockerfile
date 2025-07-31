@@ -35,6 +35,9 @@ RUN apt-get update && \
       python3.10 \
       python3.10-venv \
       python3.10-dev \
+      libreoffice-common \
+      libreoffice-writer \
+      libreoffice-impress \
       && ln -s /usr/bin/python3.10 /usr/bin/python \
       && apt-get clean \
       && rm -rf /var/lib/apt/lists/

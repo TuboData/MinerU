@@ -31,6 +31,7 @@ from magic_pdf.operators.models import InferenceResult
 from magic_pdf.operators.pipes import PipeResult
 
 from busi.tubo_marker_doc.marker_doc import MarkerDoc
+from utils.doc_helper import DocHelper
 # 导入工具类和配置加载器
 from utils.mysql_utils import MySQLUtils
 from utils.minio_utils import MinioUtils
@@ -285,6 +286,7 @@ def process_pdf_background(
         # 更新任务状态为处理中，初始进度为5%
         update_job_progress(job_id, 5.0, JobStatus.PROCESSING)
 
+        pdf_bytes = DocHelper.ensure_bytes_pdf(pdf_name, pdf_bytes)
         # 初始化结果字典 - 添加更多关键字段
         result_dict = {
             "job_id": job_id,
@@ -358,13 +360,13 @@ def process_pdf_background(
 
         # 处理PDF
         try:
-            logger.info(f"Processing PDF for job {job_id} with method {parse_method}")
+            logger.info(f"Processing DOC for job {job_id} with method {parse_method}")
             infer_result, pipe_result = process_pdf(pdf_bytes, parse_method, image_writer)
         except Exception as e:
             logger.warning(f"Job {job_id}: 处理PDF失败: {e}")
             raise e
 
-        # 更新进度到50% - PDF处理完成
+        # 更新进度到50% - DOC处理完成
         update_job_progress(job_id, 50.0)
 
         # 获取模型推理结果（这是一个关键步骤）
