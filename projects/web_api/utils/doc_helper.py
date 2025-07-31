@@ -6,7 +6,7 @@ from pathlib import Path
 
 class DocHelper:
     image_type_set = {".jpg", ".jpeg", ".png", ".gif", ".bmp"}
-    miner_u_supported_type_set = set(image_type_set.union(".pdf"))
+    miner_u_supported_type_set = set(image_type_set.union([".pdf"]))
     @staticmethod
     def ensure_bytes_pdf(file_name, doc_bytes):
         base, ext = os.path.splitext(file_name)
@@ -154,3 +154,6 @@ class DocHelper:
 
         return pdf_bytes
 
+if __name__ == "__main__":
+    # 测试代码
+    print(DocHelper.miner_u_supported_type_set)
