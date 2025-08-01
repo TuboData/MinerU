@@ -217,7 +217,7 @@ def process_pdf(
         Tuple[InferenceResult, PipeResult]: Returns inference result and pipeline result
     """
     base, ext = os.path.splitext(file_name)
-    ext = ext.lower()
+    ext = ext.rstrip("_").lower()
     if ext == ".pdf":
         ds = PymuDocDataset(pdf_bytes)
     else:

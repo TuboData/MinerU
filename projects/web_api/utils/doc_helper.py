@@ -10,7 +10,7 @@ class DocHelper:
     @staticmethod
     def ensure_bytes_pdf(file_name, doc_bytes):
         base, ext = os.path.splitext(file_name)
-        ext = ext.lower()
+        ext = ext.rstrip("_").lower()
         if ext in DocHelper.miner_u_supported_type_set:
             return doc_bytes
         elif ext in ('.doc', '.docx'):
@@ -81,14 +81,14 @@ class DocHelper:
             # 检查输出文件是否存在
             if not os.path.exists(output_path):
                 # 尝试备用文件名（旧版LibreOffice有时使用不同命名）
-                alt_output_path = os.path.join(temp_dir, f"document.{file_extension}.pdf")
+                alt_output_path = os.path.join(temp_dir, f"document{file_extension}.pdf")
                 if os.path.exists(alt_output_path):
                     output_path = alt_output_path
                     # logger.warning("使用备用输出文件名")
                 else:
                     error_msg = f"PDF文件未生成。临时目录内容: {os.listdir(temp_dir)}"
                     # logger.error(error_msg)
-                    raise RuntimeError("PDF文件未生成")
+                    raise RuntimeError(f"PDF文件未生成: {error_msg}")
 
             # 读取PDF内容
             with open(output_path, "rb") as pdf_file:
@@ -119,7 +119,7 @@ class DocHelper:
             tmp_path = Path(tmp_dir)
 
             # 写入输入文件
-            input_file = tmp_path / f"input{extension}"
+            input_file = tmp_path / f"document{extension}"
             with open(input_file, 'wb') as f:
                 f.write(input_bytes)
 
@@ -128,7 +128,7 @@ class DocHelper:
 
             # 构建转换命令
             command = [
-                'soffice',
+                'libreoffice',
                 '--headless',  # 无GUI模式
                 '--convert-to', 'pdf',
                 '--outdir', str(tmp_path),
@@ -144,13 +144,28 @@ class DocHelper:
             )
 
             # 检查转换结果
-            if result.returncode != 0 or not output_file.exists():
+            if result.returncode != 0:
                 error_msg = result.stderr.decode('utf-8', errors='ignore') or "Unknown error"
                 raise RuntimeError(f"Conversion failed with error: {error_msg}")
 
+            # 构建输出文件路径
+            output_path = os.path.join(tmp_dir, f"document.pdf")
+
+            # 检查输出文件是否存在
+            if not os.path.exists(output_path):
+                # 尝试备用文件名（旧版LibreOffice有时使用不同命名）
+                alt_output_path = os.path.join(tmp_dir, f"document{extension}.pdf")
+                if os.path.exists(alt_output_path):
+                    output_path = alt_output_path
+                    # logger.warning("使用备用输出文件名")
+                else:
+                    error_msg = f"PDF文件未生成。临时目录内容: {os.listdir(tmp_dir)}"
+                    # logger.error(error_msg)
+                    raise RuntimeError(f"PDF文件未生成: {error_msg}")
+
             # 读取PDF内容
-            with open(output_file, 'rb') as f:
-                pdf_bytes = f.read()
+            with open(output_path, "rb") as pdf_file:
+                pdf_bytes = pdf_file.read()
 
         return pdf_bytes
 
